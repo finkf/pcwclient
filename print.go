@@ -133,7 +133,7 @@ func printWord(out io.Writer) error {
 	}
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		tokens, err := cmd.client.GetWords(bookID, pageID, lineID)
+		tokens, err := cmd.client.GetTokens(bookID, pageID, lineID)
 		cmd.data = tokens
 		return err
 	})

@@ -83,7 +83,7 @@ func createBook(p string, out io.Writer) error {
 	})
 	cmd.do(func() error {
 		newBook := api.Book{
-			ProjectID:   cmd.data.(api.Book).ProjectID,
+			ProjectID:   cmd.data.(*api.Book).ProjectID,
 			Title:       bookTitle,
 			Author:      bookAuthor,
 			Description: bookDescription,

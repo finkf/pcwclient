@@ -38,7 +38,7 @@ func init() {
 	mainCommand.AddCommand(&versionCommand)
 	mainCommand.AddCommand(&rawCommand)
 	mainCommand.AddCommand(&searchCommand)
-	mainCommand.AddCommand(&correctLineCommand)
+	mainCommand.AddCommand(&correctCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	createCommand.AddCommand(&createUserCommand)
@@ -47,6 +47,8 @@ func init() {
 	printCommand.AddCommand(&printBookCommand)
 	printCommand.AddCommand(&printLineCommand)
 	printCommand.AddCommand(&printWordCommand)
+	correctCommand.AddCommand(&correctLineCommand)
+	correctCommand.AddCommand(&correctWordCommand)
 
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "", false, "enable debug output")
