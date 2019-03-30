@@ -94,10 +94,10 @@ func raw(out io.Writer, format string, args ...interface{}) error {
 }
 
 var searchCommand = cobra.Command{
-	Use:   "search QUERY",
+	Use:   "search ID QUERY",
 	Short: "search for tokens and error patterns",
 	RunE:  runSearch,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.ExactArgs(2),
 }
 
 var searchErrorPattern bool
@@ -107,16 +107,17 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	for i := 1; i < len(args); i++ {
 		iargs[i] = args[i]
 	}
-	return search(args[0], searchErrorPattern, os.Stdout)
+	return search(os.Stdout, args[0], args[1], searchErrorPattern)
 }
 
-func search(query string, errorPattern bool, out io.Writer) error {
-	if bookID == 0 {
-		return fmt.Errorf("missing book id")
+func search(out io.Writer, id, query string, errorPattern bool) error {
+	var bid int
+	if err := scanf(id, "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
 	}
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		res, err := cmd.client.Search(bookID, query, errorPattern)
+		res, err := cmd.client.Search(bid, query, errorPattern)
 		cmd.data = res
 		return err
 	})

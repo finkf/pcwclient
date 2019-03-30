@@ -13,27 +13,28 @@ import (
 var correctCommand = cobra.Command{
 	Use:   "correct",
 	Short: "Correct lines or words",
-	Args:  cobra.MinimumNArgs(1),
 }
 
 var correctLineCommand = cobra.Command{
-	Use:   "line LINE",
+	Use:   "line ID LINE",
 	Short: "Correct lines",
+	Args:  cobra.MinimumNArgs(2),
 	RunE:  doCorrectLine,
 }
 
 func doCorrectLine(cmd *cobra.Command, args []string) error {
-	return correctLine(strings.Join(args, " "), os.Stdout)
+	return correctLine(os.Stdout, args[0], strings.Join(args[1:], " "))
 }
 
-func correctLine(line string, out io.Writer) error {
-	if bookID == 0 || pageID == 0 || lineID == 0 {
-		return fmt.Errorf("missing book, page or line id")
+func correctLine(out io.Writer, id, correction string) error {
+	var bid, pid, lid int
+	if err := scanf(id, "%d:%d:%d", &bid, &pid, &lid); err != nil {
+		return fmt.Errorf("invalid line id: %s", id)
 	}
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		cor := api.Correction{Correction: line}
-		line, err := cmd.client.PostLine(bookID, pageID, lineID, cor)
+		cor := api.Correction{Correction: correction}
+		line, err := cmd.client.PostLine(bid, pid, lid, cor)
 		cmd.data = line
 		return err
 	})
@@ -43,24 +44,25 @@ func correctLine(line string, out io.Writer) error {
 }
 
 var correctWordCommand = cobra.Command{
-	Use:   "word WORD",
+	Use:   "word ID WORD",
 	Short: "Correct words",
+	Args:  cobra.ExactArgs(2),
 	RunE:  doCorrectWord,
-	Args:  cobra.MinimumNArgs(1),
 }
 
 func doCorrectWord(cmd *cobra.Command, args []string) error {
-	return correctWord(strings.Join(args, " "), os.Stdout)
+	return correctWord(os.Stdout, args[0], args[1])
 }
 
-func correctWord(word string, out io.Writer) error {
-	if bookID == 0 || pageID == 0 || lineID == 0 || wordID == 0 {
-		return fmt.Errorf("missing book, page, line or word id")
+func correctWord(out io.Writer, id, correction string) error {
+	var bid, pid, lid, wid int
+	if err := scanf(id, "%d:%d:%d:%d", &bid, &pid, &lid, &wid); err != nil {
+		return fmt.Errorf("invalid line id: %s", id)
 	}
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		cor := api.Correction{Correction: word}
-		word, err := cmd.client.PostToken(bookID, pageID, lineID, wordID, cor)
+		cor := api.Correction{Correction: correction}
+		word, err := cmd.client.PostToken(bid, pid, lid, wid, cor)
 		cmd.data = word
 		return err
 	})

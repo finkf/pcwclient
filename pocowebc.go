@@ -23,11 +23,6 @@ var (
 	formatString = ""
 	authToken    = ""
 	pocowebURL   = ""
-	userID       = 0
-	bookID       = 0
-	pageID       = 0
-	lineID       = 0
-	wordID       = 0
 )
 
 func init() {
@@ -41,6 +36,8 @@ func init() {
 	mainCommand.AddCommand(&correctCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
+	listCommand.AddCommand(&listUsersCommand)
+	listCommand.AddCommand(&listBooksCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
 	printCommand.AddCommand(&printPageCommand)
@@ -50,16 +47,11 @@ func init() {
 	correctCommand.AddCommand(&correctLineCommand)
 	correctCommand.AddCommand(&correctWordCommand)
 
-	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "output raw json")
-	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "", false, "enable debug output")
+	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false, "output raw json")
+	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false, "enable debug output")
 	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(), "set pocoweb url")
-	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "f", "", "set output format")
-	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "a", auth(), "set auth token")
-	mainCommand.PersistentFlags().IntVarP(&userID, "user-id", "u", 0, "set user id")
-	mainCommand.PersistentFlags().IntVarP(&bookID, "book-id", "b", 0, "set book id")
-	mainCommand.PersistentFlags().IntVarP(&pageID, "page-id", "p", 0, "set page id")
-	mainCommand.PersistentFlags().IntVarP(&lineID, "line-id", "l", 0, "set line id")
-	mainCommand.PersistentFlags().IntVarP(&wordID, "word-id", "w", 0, "set word id")
+	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "", "set output format")
+	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A", auth(), "set auth token")
 }
 
 func url() string {
@@ -76,6 +68,11 @@ func auth() string {
 	return os.Getenv("POCOWEBC_AUTH")
 }
 
+func scanf(str, format string, args ...interface{}) error {
+	_, err := fmt.Sscanf(str, format, args...)
+	return err
+}
+
 type command struct {
 	client *api.Client
 	data   interface{}
@@ -90,7 +87,7 @@ func newCommand(out io.Writer) command {
 	auth := auth()
 	if auth == "" {
 		return command{err: fmt.Errorf("missing login information: " +
-			"use --auth or set POCOWEBC_AUTH envinronment variable")}
+			"use --auth or set POCOWEBC_AUTH environment variable")}
 	}
 	return command{client: api.Authenticate(url(), auth), out: out}
 }

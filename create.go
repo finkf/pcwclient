@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -15,19 +16,19 @@ import (
 )
 
 func init() {
-	createBookCommand.Flags().StringVarP(&bookAuthor, "author", "A", "", "set book's author (required)")
-	createBookCommand.Flags().StringVarP(&bookTitle, "title", "T", "", "set book's title (required)")
-	createBookCommand.Flags().StringVarP(&bookDescription, "description", "D", "", "set book's description")
-	createBookCommand.Flags().StringVarP(&bookLanguage, "language", "L", "", "set book's language")
-	createBookCommand.Flags().StringVarP(&bookProfilerURL, "profilerurl", "P", "local", "set book's profiler url")
-	createBookCommand.Flags().IntVarP(&bookYear, "year", "Y", 1900, "set book's year")
+	createBookCommand.Flags().StringVarP(&bookAuthor, "author", "a", "", "set book's author (required)")
+	createBookCommand.Flags().StringVarP(&bookTitle, "title", "t", "", "set book's title (required)")
+	createBookCommand.Flags().StringVarP(&bookDescription, "description", "d", "", "set book's description")
+	createBookCommand.Flags().StringVarP(&bookLanguage, "language", "l", "", "set book's language")
+	createBookCommand.Flags().StringVarP(&bookProfilerURL, "profilerurl", "p", "local", "set book's profiler url")
+	createBookCommand.Flags().IntVarP(&bookYear, "year", "y", 1900, "set book's year")
 	cobra.MarkFlagRequired(createBookCommand.Flags(), "author")
 	cobra.MarkFlagRequired(createBookCommand.Flags(), "title")
-	createUserCommand.Flags().StringVarP(&userName, "name", "N", "", "set the user's name (required)")
-	createUserCommand.Flags().StringVarP(&userEmail, "email", "E", "", "set the user's name (required)")
-	createUserCommand.Flags().StringVarP(&userPassword, "password", "P", "", "set the user's password (required)")
-	createUserCommand.Flags().StringVarP(&userInstitute, "institute", "I", "", "set the user's institute")
-	createUserCommand.Flags().BoolVarP(&userAdmin, "admin", "R", false, "user has administrator permissions")
+	createUserCommand.Flags().StringVarP(&userName, "name", "n", "", "set the user's name (required)")
+	createUserCommand.Flags().StringVarP(&userEmail, "email", "e", "", "set the user's name (required)")
+	createUserCommand.Flags().StringVarP(&userPassword, "password", "p", "", "set the user's password (required)")
+	createUserCommand.Flags().StringVarP(&userInstitute, "institute", "i", "", "set the user's institute")
+	createUserCommand.Flags().BoolVarP(&userAdmin, "admin", "a", false, "user has administrator permissions")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "name")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "email")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "password")
@@ -35,11 +36,11 @@ func init() {
 
 var createCommand = cobra.Command{
 	Use:   "create",
-	Short: "Create various things",
+	Short: "Create books and users",
 }
 
 var createBookCommand = cobra.Command{
-	Use:   "book",
+	Use:   "book [ZIP|DIR]",
 	Short: "Create a new book",
 	RunE:  doCreateBook,
 	Args:  cobra.ExactArgs(1),
@@ -50,8 +51,8 @@ var (
 	bookTitle       = ""
 	bookDescription = ""
 	bookLanguage    = ""
-	bookProfilerURL = ""
-	bookYear        = 0
+	bookProfilerURL = "local"
+	bookYear        = 1900
 	userName        = ""
 	userEmail       = ""
 	userInstitute   = ""
@@ -64,6 +65,9 @@ func doCreateBook(cmd *cobra.Command, args []string) error {
 }
 
 func createBook(p string, out io.Writer) error {
+	if bookAuthor == "" || bookTitle == "" || bookLanguage == "" {
+		return fmt.Errorf("missing title, author and/or language")
+	}
 	var zip io.ReadCloser
 	var err error
 	cmd := newCommand(out)
@@ -163,6 +167,9 @@ func doCreateUser(cmd *cobra.Command, args []string) error {
 }
 
 func createUser(out io.Writer) error {
+	if userEmail == "" || userPassword == "" {
+		return fmt.Errorf("missing user email and/or password")
+	}
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		req := api.CreateUserRequest{
