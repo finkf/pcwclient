@@ -135,9 +135,9 @@ func search(out io.Writer, id, query string, errorPattern bool) error {
 
 func printSearchMatch(out io.Writer, line api.Line, token api.Token) error {
 	c := color.New(color.FgRed)
-	offset := strings.Index(line.Cor[token.Offset:], token.Cor) + token.Offset
-	matchEnd := offset + len(token.Cor)
-	prefix, match, suffix := line.Cor[0:offset], line.Cor[offset:matchEnd], line.Cor[matchEnd:]
+	o := strings.Index(line.Cor[token.Offset:], token.Cor) + token.Offset
+	e := o + len(token.Cor)
+	prefix, match, suffix := line.Cor[0:o], line.Cor[o:e], line.Cor[e:]
 	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s",
 		line.ProjectID, line.PageID, line.LineID, token.TokenID, prefix)
 	if err != nil {
