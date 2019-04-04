@@ -57,7 +57,7 @@ func printBook(out io.Writer, id string) error {
 			return err
 		})
 		cmd.do(func() error {
-			return cmd.print(out, cmd.data)
+			return cmd.print(cmd.data)
 		})
 	}
 	return cmd.err
@@ -86,7 +86,7 @@ func printPage(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return cmd.print(out, cmd.data)
+		return cmd.print(cmd.data)
 	})
 }
 
@@ -113,7 +113,7 @@ func printLine(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return cmd.print(out, cmd.data)
+		return cmd.print(cmd.data)
 	})
 }
 
@@ -149,6 +149,6 @@ func printWord(out io.Writer, id string) error {
 		return fmt.Errorf("invalid word id: %d", wid)
 	})
 	return cmd.output(func() error {
-		return cmd.print(out, cmd.data)
+		return cmd.print(cmd.data)
 	})
 }
