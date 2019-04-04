@@ -25,12 +25,12 @@ func init() {
 var printCommand = cobra.Command{
 	Use:   "print",
 	Short: "print pages, lines and words",
-	Args:  cobra.ExactArgs(1),
 }
 
 var printBookCommand = cobra.Command{
 	Use:   "book",
 	Short: "print out book contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintBook,
 }
 
@@ -66,6 +66,7 @@ func printBook(out io.Writer, id string) error {
 var printPageCommand = cobra.Command{
 	Use:   "page ID",
 	Short: "print page contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintPage,
 }
 
@@ -92,6 +93,7 @@ func printPage(out io.Writer, id string) error {
 var printLineCommand = cobra.Command{
 	Use:   "line ID",
 	Short: "print line contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintLine,
 }
 
@@ -118,6 +120,7 @@ func printLine(out io.Writer, id string) error {
 var printWordCommand = cobra.Command{
 	Use:   "word ID",
 	Short: "print words",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintWord,
 }
 
