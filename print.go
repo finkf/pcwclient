@@ -9,6 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var printWords bool
+
+func init() {
+	printBookCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printPageCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printLineCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printWordCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"(ignored)")
+}
+
 var printCommand = cobra.Command{
 	Use:   "print",
 	Short: "print pages, lines and words",
@@ -44,7 +57,7 @@ func printBook(out io.Writer, id string) error {
 			return err
 		})
 		cmd.do(func() error {
-			return iprint(out, cmd.data)
+			return cmd.print(out, cmd.data)
 		})
 	}
 	return cmd.err
@@ -72,7 +85,7 @@ func printPage(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return iprint(out, cmd.data)
+		return cmd.print(out, cmd.data)
 	})
 }
 
@@ -98,7 +111,7 @@ func printLine(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return iprint(out, cmd.data)
+		return cmd.print(out, cmd.data)
 	})
 }
 
@@ -133,39 +146,6 @@ func printWord(out io.Writer, id string) error {
 		return fmt.Errorf("invalid word id: %d", wid)
 	})
 	return cmd.output(func() error {
-		return iprint(out, cmd.data)
+		return cmd.print(out, cmd.data)
 	})
-}
-
-func iprint(out io.Writer, what interface{}) error {
-	switch t := what.(type) {
-	case *api.Page:
-		return iprintPage(out, t)
-	case *api.Line:
-		return iprintLine(out, t)
-	case *api.Token:
-		return iprintWord(out, t)
-	}
-	panic("no reacheable")
-}
-
-func iprintPage(out io.Writer, page *api.Page) error {
-	for _, line := range page.Lines {
-		if err := iprintLine(out, &line); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func iprintLine(out io.Writer, line *api.Line) error {
-	_, err := fmt.Fprintf(out, "%d:%d:%d %s\n",
-		line.ProjectID, line.PageID, line.LineID, line.Cor)
-	return err
-}
-
-func iprintWord(out io.Writer, word *api.Token) error {
-	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s\n",
-		word.ProjectID, word.PageID, word.LineID, word.TokenID, word.Cor)
-	return err
 }
