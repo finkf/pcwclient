@@ -36,29 +36,18 @@ func printBook(out io.Writer, id string) error {
 		cmd.data = api.BookWithPages{Book: *book}
 		return err
 	})
-	cmd.do(func() error {
-		book := cmd.data.(api.BookWithPages)
-		for _, id := range book.PageIDs {
+	book := cmd.data.(api.BookWithPages)
+	for _, id := range book.PageIDs {
+		cmd.do(func() error {
 			page, err := cmd.client.GetPage(book.ProjectID, id)
-			if err != nil {
-				return err
-			}
-			book.PageContent = append(book.PageContent, *page)
-		}
-		cmd.data = book
-		return nil
-	})
-	return cmd.output(func() error {
-		for _, page := range cmd.data.(api.BookWithPages).PageContent {
-			for _, line := range page.Lines {
-				err := doPrintLine(out, line)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+			cmd.data = page
+			return err
+		})
+		cmd.do(func() error {
+			return doPrintPage(out, cmd.data.(*api.Page))
+		})
+	}
+	return cmd.err
 }
 
 var printPageCommand = cobra.Command{
@@ -155,6 +144,15 @@ func printWord(out io.Writer, id string) error {
 		_, err := fmt.Fprintln(out, cmd.data.(api.Token).Cor)
 		return err
 	})
+}
+
+func doPrintPage(out io.Writer, page *api.Page) error {
+	for _, line := range page.Lines {
+		if err := doPrintLine(out, line); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func doPrintLine(out io.Writer, line api.Line) error {
