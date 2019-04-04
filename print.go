@@ -44,7 +44,7 @@ func printBook(out io.Writer, id string) error {
 			return err
 		})
 		cmd.do(func() error {
-			return doPrintPage(out, cmd.data.(*api.Page))
+			return iprint(out, cmd.data)
 		})
 	}
 	return cmd.err
@@ -72,14 +72,7 @@ func printPage(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		page := cmd.data.(*api.Page)
-		for i := range page.Lines {
-			err := doPrintLine(out, page.Lines[i])
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		return iprint(out, cmd.data)
 	})
 }
 
@@ -105,8 +98,7 @@ func printLine(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		_, err := fmt.Fprintln(out, cmd.data.(*api.Line).Cor)
-		return err
+		return iprint(out, cmd.data)
 	})
 }
 
@@ -134,34 +126,45 @@ func printWord(out io.Writer, id string) error {
 	cmd.do(func() error {
 		for _, word := range cmd.data.(api.Tokens).Tokens {
 			if word.TokenID == wid {
-				cmd.data = word
+				cmd.data = &word
 				return nil
 			}
 		}
 		return fmt.Errorf("invalid word id: %d", wid)
 	})
 	return cmd.output(func() error {
-		_, err := fmt.Fprintln(out, cmd.data.(api.Token).Cor)
-		return err
+		return iprint(out, cmd.data)
 	})
 }
 
-func doPrintPage(out io.Writer, page *api.Page) error {
+func iprint(out io.Writer, what interface{}) error {
+	switch t := what.(type) {
+	case *api.Page:
+		return iprintPage(out, t)
+	case *api.Line:
+		return iprintLine(out, t)
+	case *api.Token:
+		return iprintWord(out, t)
+	}
+	panic("no reacheable")
+}
+
+func iprintPage(out io.Writer, page *api.Page) error {
 	for _, line := range page.Lines {
-		if err := doPrintLine(out, line); err != nil {
+		if err := iprintLine(out, &line); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func doPrintLine(out io.Writer, line api.Line) error {
+func iprintLine(out io.Writer, line *api.Line) error {
 	_, err := fmt.Fprintf(out, "%d:%d:%d %s\n",
 		line.ProjectID, line.PageID, line.LineID, line.Cor)
 	return err
 }
 
-func doPrintWord(out io.Writer, word api.Token) error {
+func iprintWord(out io.Writer, word *api.Token) error {
 	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s\n",
 		word.ProjectID, word.PageID, word.LineID, word.TokenID, word.Cor)
 	return err
