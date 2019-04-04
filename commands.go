@@ -138,7 +138,7 @@ func printSearchMatch(out io.Writer, line api.Line, token api.Token) error {
 	offset := strings.Index(line.Cor[token.Offset:], token.Cor) + token.Offset
 	matchEnd := offset + len(token.Cor)
 	prefix, match, suffix := line.Cor[0:offset], line.Cor[offset:matchEnd], line.Cor[matchEnd:]
-	_, err := fmt.Fprintf(out, "%d:%d:%d:%d:%s",
+	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s",
 		line.ProjectID, line.PageID, line.LineID, token.TokenID, prefix)
 	if err != nil {
 		return err
