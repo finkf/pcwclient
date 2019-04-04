@@ -105,7 +105,7 @@ var searchErrorPattern bool
 func runSearch(cmd *cobra.Command, args []string) error {
 	iargs := make([]interface{}, len(args)-1)
 	for i := 1; i < len(args); i++ {
-		iargs[i] = args[i]
+		iargs[i-1] = args[i]
 	}
 	return search(os.Stdout, args[0], args[1], searchErrorPattern)
 }
