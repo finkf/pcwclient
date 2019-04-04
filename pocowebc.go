@@ -52,9 +52,11 @@ func init() {
 
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "j", false, "output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "", false, "enable debug output")
-	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(), "set pocoweb url")
+	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(),
+		"set pocoweb url (env: POCOWEBC_URL)")
 	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "f", "", "set output format")
-	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "a", auth(), "set auth token")
+	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "a", auth(),
+		"set auth token (env: POCOWEBC_AUTH)")
 	mainCommand.PersistentFlags().IntVarP(&userID, "user-id", "u", 0, "set user id")
 	mainCommand.PersistentFlags().IntVarP(&bookID, "book-id", "b", 0, "set book id")
 	mainCommand.PersistentFlags().IntVarP(&pageID, "page-id", "p", 0, "set page id")
