@@ -39,7 +39,7 @@ func correctLine(out io.Writer, id, correction string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return doPrintLine(out, *cmd.data.(*api.Line))
+		return cmd.print(cmd.data)
 	})
 }
 
@@ -67,6 +67,6 @@ func correctWord(out io.Writer, id, correction string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		return doPrintWord(out, *cmd.data.(*api.Token))
+		return cmd.print(cmd.data)
 	})
 }

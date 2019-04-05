@@ -9,15 +9,28 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var printWords bool
+
+func init() {
+	printBookCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printPageCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printLineCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"print words not lines")
+	printWordCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+		"(ignored)")
+}
+
 var printCommand = cobra.Command{
 	Use:   "print",
 	Short: "print pages, lines and words",
-	Args:  cobra.ExactArgs(1),
 }
 
 var printBookCommand = cobra.Command{
 	Use:   "book",
 	Short: "print out book contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintBook,
 }
 
@@ -36,34 +49,24 @@ func printBook(out io.Writer, id string) error {
 		cmd.data = api.BookWithPages{Book: *book}
 		return err
 	})
-	cmd.do(func() error {
-		book := cmd.data.(api.BookWithPages)
-		for _, id := range book.PageIDs {
+	book := cmd.data.(api.BookWithPages)
+	for _, id := range book.PageIDs {
+		cmd.do(func() error {
 			page, err := cmd.client.GetPage(book.ProjectID, id)
-			if err != nil {
-				return err
-			}
-			book.PageContent = append(book.PageContent, *page)
-		}
-		cmd.data = book
-		return nil
-	})
-	return cmd.output(func() error {
-		for _, page := range cmd.data.(api.BookWithPages).PageContent {
-			for _, line := range page.Lines {
-				err := doPrintLine(out, line)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
+			cmd.data = page
+			return err
+		})
+		cmd.do(func() error {
+			return cmd.print(cmd.data)
+		})
+	}
+	return cmd.err
 }
 
 var printPageCommand = cobra.Command{
 	Use:   "page ID",
 	Short: "print page contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintPage,
 }
 
@@ -83,20 +86,14 @@ func printPage(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		page := cmd.data.(*api.Page)
-		for i := range page.Lines {
-			err := doPrintLine(out, page.Lines[i])
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		return cmd.print(cmd.data)
 	})
 }
 
 var printLineCommand = cobra.Command{
 	Use:   "line ID",
 	Short: "print line contents",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintLine,
 }
 
@@ -116,14 +113,14 @@ func printLine(out io.Writer, id string) error {
 		return err
 	})
 	return cmd.output(func() error {
-		_, err := fmt.Fprintln(out, cmd.data.(*api.Line).Cor)
-		return err
+		return cmd.print(cmd.data)
 	})
 }
 
 var printWordCommand = cobra.Command{
 	Use:   "word ID",
 	Short: "print words",
+	Args:  cobra.ExactArgs(1),
 	RunE:  runPrintWord,
 }
 
@@ -145,26 +142,13 @@ func printWord(out io.Writer, id string) error {
 	cmd.do(func() error {
 		for _, word := range cmd.data.(api.Tokens).Tokens {
 			if word.TokenID == wid {
-				cmd.data = word
+				cmd.data = &word
 				return nil
 			}
 		}
 		return fmt.Errorf("invalid word id: %d", wid)
 	})
 	return cmd.output(func() error {
-		_, err := fmt.Fprintln(out, cmd.data.(api.Token).Cor)
-		return err
+		return cmd.print(cmd.data)
 	})
-}
-
-func doPrintLine(out io.Writer, line api.Line) error {
-	_, err := fmt.Fprintf(out, "%d:%d:%d %s\n",
-		line.ProjectID, line.PageID, line.LineID, line.Cor)
-	return err
-}
-
-func doPrintWord(out io.Writer, word api.Token) error {
-	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s\n",
-		word.ProjectID, word.PageID, word.LineID, word.TokenID, word.Cor)
-	return err
 }

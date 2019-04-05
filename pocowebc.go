@@ -124,3 +124,54 @@ func (cmd *command) do(f func() error) {
 	}
 	cmd.err = f()
 }
+
+func (cmd *command) print(what interface{}) error {
+	switch t := what.(type) {
+	case *api.Page:
+		cmd.err = cmd.printPage(t)
+	case *api.Line:
+		cmd.err = cmd.printLine(t)
+	case *api.Token:
+		cmd.err = cmd.printWord(t)
+	case []api.Token:
+		cmd.err = cmd.printWords(t)
+	}
+	return cmd.err
+}
+
+func (cmd *command) printPage(page *api.Page) error {
+	for _, line := range page.Lines {
+		if err := cmd.printLine(&line); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printLine(line *api.Line) error {
+	if !printWords {
+		_, err := fmt.Fprintf(cmd.out, "%d:%d:%d %s\n",
+			line.ProjectID, line.PageID, line.LineID, line.Cor)
+		return err
+	}
+	words, err := cmd.client.GetTokens(line.ProjectID, line.PageID, line.LineID)
+	if err != nil {
+		return err
+	}
+	return cmd.printWords(words.Tokens)
+}
+
+func (cmd *command) printWords(words []api.Token) error {
+	for _, word := range words {
+		if err := cmd.printWord(&word); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printWord(word *api.Token) error {
+	_, err := fmt.Fprintf(cmd.out, "%d:%d:%d:%d %s\n",
+		word.ProjectID, word.PageID, word.LineID, word.TokenID, word.Cor)
+	return err
+}
