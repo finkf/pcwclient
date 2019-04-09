@@ -33,7 +33,9 @@ func login(out io.Writer, user, password string) error {
 	}
 	client, err := api.Login(url(), user, password)
 	cmd := command{client: client, err: err, out: out}
-	cmd.add(cmd.client.Session)
+	if err == nil {
+		cmd.add(client.Session)
+	}
 	return cmd.print()
 }
 
