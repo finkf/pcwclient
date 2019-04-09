@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
-	"github.com/finkf/pcwgo/api"
 	"github.com/spf13/cobra"
 )
 
@@ -34,13 +32,10 @@ func listUser(out io.Writer, id string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		user, err := cmd.client.GetUser(int64(uid))
-		cmd.data = user
+		cmd.add(user)
 		return err
 	})
-	return cmd.output(func() error {
-		user := cmd.data.(api.User)
-		return infoUser(cmd.out, user)
-	})
+	return cmd.print()
 }
 
 var listUsersCommand = cobra.Command{
@@ -56,19 +51,11 @@ func doListUsers(cmd *cobra.Command, args []string) error {
 func listUsers(out io.Writer) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		user, err := cmd.client.GetUsers()
-		cmd.data = user
+		users, err := cmd.client.GetUsers()
+		cmd.add(users)
 		return err
 	})
-	return cmd.output(func() error {
-		users := cmd.data.(api.Users)
-		for _, user := range users.Users {
-			if err := infoUser(cmd.out, user); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	return cmd.print()
 }
 
 var listBookCommand = cobra.Command{
@@ -90,13 +77,10 @@ func listBook(out io.Writer, id string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		book, err := cmd.client.GetBook(bid)
-		cmd.data = book
+		cmd.add(book)
 		return err
 	})
-	return cmd.output(func() error {
-		book := cmd.data.(*api.Book)
-		return infoBook(cmd.out, *book)
-	})
+	return cmd.print()
 }
 
 var listBooksCommand = cobra.Command{
@@ -113,35 +97,8 @@ func listBooks(out io.Writer) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		books, err := cmd.client.GetBooks()
-		cmd.data = books
+		cmd.add(books)
 		return err
 	})
-	return cmd.output(func() error {
-		books := cmd.data.(*api.Books)
-		for _, book := range books.Books {
-			if err := infoBook(cmd.out, book); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func infoUser(out io.Writer, user api.User) error {
-	return info(out, "%d\t%s\t%s\t%s\t%t\n",
-		user.ID, user.Name, user.Email, user.Institute, user.Admin)
-}
-
-func infoBook(out io.Writer, book api.Book) error {
-	return info(out, "%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\n",
-		book.ProjectID, book.Author, book.Title, book.Description,
-		book.Year, book.Language, book.ProfilerURL, book.IsBook)
-}
-
-func info(out io.Writer, format string, args ...interface{}) error {
-	str := fmt.Sprintf(format, args...)
-	str = strings.Replace(str, " ", "_", -1)
-	str = strings.Replace(str, "\t", " ", -1)
-	_, err := fmt.Fprint(out, str)
-	return err
+	return cmd.print()
 }

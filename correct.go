@@ -35,12 +35,10 @@ func correctLine(out io.Writer, id, correction string) error {
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
 		line, err := cmd.client.PostLine(bid, pid, lid, cor)
-		cmd.data = line
+		cmd.add(line)
 		return err
 	})
-	return cmd.output(func() error {
-		return cmd.print(cmd.data)
-	})
+	return cmd.print()
 }
 
 var correctWordCommand = cobra.Command{
@@ -63,10 +61,8 @@ func correctWord(out io.Writer, id, correction string) error {
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
 		word, err := cmd.client.PostToken(bid, pid, lid, wid, cor)
-		cmd.data = word
+		cmd.add(word)
 		return err
 	})
-	return cmd.output(func() error {
-		return cmd.print(cmd.data)
-	})
+	return cmd.print()
 }

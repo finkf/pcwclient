@@ -25,7 +25,7 @@ var printCommand = cobra.Command{
 func printIDs(_ *cobra.Command, args []string) error {
 	cmd := newCommand(os.Stdout)
 	for _, id := range args {
-		getByID(cmd, id)
+		getByID(&cmd, id)
 	}
 	return cmd.print()
 }
@@ -41,11 +41,11 @@ func getByID(cmd *command, id string) {
 			getLine(cmd, bid, pid, lid)
 			return nil
 		}
-		if err := scanf(id, "%d:%d:%d:%d", &bid, &pid); err == nil {
+		if err := scanf(id, "%d:%d", &bid, &pid); err == nil {
 			getPage(cmd, bid, pid)
 			return nil
 		}
-		if err := scanf(id, "%d:%d:%d:%d", &bid); err == nil {
+		if err := scanf(id, "%d", &bid); err == nil {
 			getPages(cmd, bid)
 			return nil
 		}
@@ -63,9 +63,12 @@ func getPages(cmd *command, bid int) {
 	cmd.do(func() error {
 		for _, pid := range book.PageIDs {
 			page, err := cmd.client.GetPage(book.ProjectID, pid)
+			if err != nil {
+				return err
+			}
 			cmd.add(page)
-			return err
 		}
+		return nil
 	})
 }
 
@@ -89,7 +92,7 @@ func getWord(cmd *command, bid, pid, lid, wid int) {
 	cmd.do(func() error {
 		tokens, err := cmd.client.GetTokens(bid, pid, lid)
 		var found bool
-		for _, word := range tokens {
+		for _, word := range tokens.Tokens {
 			if word.TokenID == wid {
 				cmd.add(&word)
 				found = true

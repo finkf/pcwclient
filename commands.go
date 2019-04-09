@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
-	"time"
 
-	"github.com/fatih/color"
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -27,25 +24,17 @@ var loginCommand = cobra.Command{
 
 func runLogin(cmd *cobra.Command, args []string) error {
 	user, password := args[0], args[1]
-	return login(user, password, os.Stdout)
+	return login(os.Stdout, user, password)
 }
 
-func login(user, password string, out io.Writer) error {
+func login(out io.Writer, user, password string) error {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
 	client, err := api.Login(url(), user, password)
 	cmd := command{client: client, err: err, out: out}
-	if cmd.err == nil {
-		cmd.data = cmd.client.Session
-	}
-	return cmd.output(func() error {
-		s := cmd.data.(api.Session)
-		t := time.Unix(s.Expires, 0).Format(time.RFC3339)
-		_, err := fmt.Fprintf(out, "%d\t%s\t%s\t%s\n",
-			s.User.ID, s.User.Email, s.Auth, t)
-		return err
-	})
+	cmd.add(cmd.client.Session)
+	return cmd.print()
 }
 
 var versionCommand = cobra.Command{
@@ -62,13 +51,10 @@ func version(out io.Writer) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		version, err := cmd.client.GetAPIVersion()
-		cmd.data = version
+		cmd.add(version)
 		return err
 	})
-	return cmd.output(func() error {
-		_, err := fmt.Fprintln(out, cmd.data.(api.Version).Version)
-		return err
-	})
+	return cmd.print()
 }
 
 var rawCommand = cobra.Command{
@@ -115,35 +101,8 @@ func search(out io.Writer, id, query string, errorPattern bool) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		res, err := cmd.client.Search(bid, query, errorPattern)
-		cmd.data = res
+		cmd.add(res)
 		return err
 	})
-	return cmd.output(func() error {
-		for _, match := range cmd.data.(*api.SearchResults).Matches {
-			for _, token := range match.Tokens {
-				if err := printSearchMatch(out, match.Line, token); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-}
-
-func printSearchMatch(out io.Writer, line api.Line, token api.Token) error {
-	c := color.New(color.FgRed)
-	o := strings.Index(line.Cor[token.Offset:], token.Cor) + token.Offset
-	e := o + len(token.Cor)
-	prefix, match, suffix := line.Cor[0:o], line.Cor[o:e], line.Cor[e:]
-	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s",
-		line.ProjectID, line.PageID, line.LineID, token.TokenID, prefix)
-	if err != nil {
-		return err
-	}
-	_, err = c.Fprint(out, match)
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(out, suffix)
-	return err
+	return cmd.print()
 }
