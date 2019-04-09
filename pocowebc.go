@@ -40,18 +40,17 @@ func init() {
 	listCommand.AddCommand(&listBooksCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
-	printCommand.AddCommand(&printPageCommand)
-	printCommand.AddCommand(&printBookCommand)
-	printCommand.AddCommand(&printLineCommand)
-	printCommand.AddCommand(&printWordCommand)
 	correctCommand.AddCommand(&correctLineCommand)
 	correctCommand.AddCommand(&correctWordCommand)
 
-	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false, "output raw json")
-	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false, "enable debug output")
+	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
+		"output raw json")
+	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
+		"enable debug output")
 	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(),
 		"set pocoweb url (env: POCWEBC_URL)")
-	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "", "set output format")
+	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "",
+		"set output format")
 	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A", auth(),
 		"set auth token (env: POCWEBC_AUTH)")
 }
