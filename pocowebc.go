@@ -50,11 +50,11 @@ func init() {
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
 		"enable debug output")
 	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(),
-		"set pocoweb url (env: POCWEBC_URL)")
+		"set pocoweb url (env: POCOWEBC_URL)")
 	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "",
 		"set output format")
 	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A", auth(),
-		"set auth token (env: POCWEBC_AUTH)")
+		"set auth token (env: POCOWEBC_AUTH)")
 }
 
 func url() string {
