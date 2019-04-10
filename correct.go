@@ -30,7 +30,7 @@ func doCorrect(cmd *cobra.Command, args []string) error {
 	}
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
-		args := strings.Split(s.Text(), " \t")
+		args := strings.Fields(s.Text())
 		if len(args) < 2 {
 			return fmt.Errorf("invalid input line: %q", s.Text())
 		}
