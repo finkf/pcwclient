@@ -315,10 +315,19 @@ func (cmd *command) printBooks(books *api.Books) error {
 	return nil
 }
 
+func toStrings(xs []int) []string {
+	res := make([]string, len(xs))
+	for i, x := range xs {
+		res[i] = string(x)
+	}
+	return res
+}
+
 func (cmd *command) printBook(book *api.Book) error {
-	return cmd.info("%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\n",
+	return cmd.info("%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\t%s\n",
 		book.ProjectID, book.Author, book.Title, book.Description,
-		book.Year, book.Language, book.ProfilerURL, book.IsBook)
+		book.Year, book.Language, book.ProfilerURL, book.IsBook,
+		strings.Join(toStrings(book.PageIDs), ","))
 }
 
 func (cmd *command) info(format string, args ...interface{}) error {
