@@ -108,3 +108,41 @@ func search(out io.Writer, id, query string, errorPattern bool) error {
 	})
 	return cmd.print()
 }
+
+var downloadCommand = cobra.Command{
+	Use:   "download ID [OUTPUT-FILE]",
+	Short: "login to pocoweb",
+	RunE:  doDownload,
+	Args:  cobra.RangeArgs(1, 2),
+}
+
+func doDownload(cmd *cobra.Command, args []string) error {
+	if len(args) == 1 {
+		return download(os.Stdout, args[0])
+	}
+	out, err := os.Create(args[1])
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	return download(out, args[0])
+}
+
+func download(out io.Writer, id string) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		bid, ok := bookID(id)
+		if !ok {
+			return fmt.Errorf("invalid book id: %s", id)
+		}
+		r, err := cmd.client.Download(bid)
+		if err != nil {
+			return err
+		}
+		defer r.Close()
+		n, err := io.Copy(cmd.out, r)
+		log.Debugf("wrote %d bytes", n)
+		return err
+	})
+	return cmd.err
+}

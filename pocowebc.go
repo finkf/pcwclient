@@ -36,6 +36,7 @@ func init() {
 	mainCommand.AddCommand(&rawCommand)
 	mainCommand.AddCommand(&searchCommand)
 	mainCommand.AddCommand(&correctCommand)
+	mainCommand.AddCommand(&downloadCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	listCommand.AddCommand(&listUsersCommand)
