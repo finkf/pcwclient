@@ -11,8 +11,8 @@ import (
 )
 
 func init() {
-	searchCommand.Flags().BoolVarP(&searchErrorPattern, "error-pattern", "e", false,
-		"search for error patterns")
+	searchCommand.Flags().BoolVarP(&searchErrorPattern, "error-pattern", "e",
+		false, "search for error patterns")
 }
 
 var loginCommand = cobra.Command{
