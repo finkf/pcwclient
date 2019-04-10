@@ -227,7 +227,7 @@ func (cmd *command) printArray(xs []interface{}) error {
 
 func (cmd *command) printSession(s api.Session) error {
 	t := time.Unix(s.Expires, 0).Format(time.RFC3339)
-	return info(cmd.out, "%d\t%s\t%s\t%s\t%s\n",
+	return cmd.info("%d\t%s\t%s\t%s\t%s\n",
 		s.User.ID, s.User.Email, s.Auth, t, s.User.Name)
 }
 
@@ -275,7 +275,7 @@ func (cmd *command) printUsers(users api.Users) error {
 }
 
 func (cmd *command) printUser(user api.User) error {
-	return info(cmd.out, "%d\t%s\t%s\t%s\t%t\n",
+	return cmd.info("%d\t%s\t%s\t%s\t%t\n",
 		user.ID, user.Name, user.Email, user.Institute, user.Admin)
 }
 
@@ -289,15 +289,15 @@ func (cmd *command) printBooks(books *api.Books) error {
 }
 
 func (cmd *command) printBook(book *api.Book) error {
-	return info(cmd.out, "%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\n",
+	return cmd.info("%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\n",
 		book.ProjectID, book.Author, book.Title, book.Description,
 		book.Year, book.Language, book.ProfilerURL, book.IsBook)
 }
 
-func info(out io.Writer, format string, args ...interface{}) error {
+func (cmd *command) info(format string, args ...interface{}) error {
 	str := fmt.Sprintf(format, args...)
 	str = strings.Replace(str, " ", "_", -1)
 	str = strings.Replace(str, "\t", " ", -1)
-	_, err := fmt.Fprint(out, str)
+	_, err := fmt.Fprint(cmd.out, str)
 	return err
 }
