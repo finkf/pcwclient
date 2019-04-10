@@ -42,8 +42,6 @@ func init() {
 	listCommand.AddCommand(&listBooksCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
-	correctCommand.AddCommand(&correctLineCommand)
-	correctCommand.AddCommand(&correctWordCommand)
 
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
 		"output raw json")

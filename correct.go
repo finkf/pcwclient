@@ -11,26 +11,24 @@ import (
 )
 
 var correctCommand = cobra.Command{
-	Use:   "correct",
+	Use:   "correct ID CORRECTION...",
 	Short: "Correct lines or words",
-}
-
-var correctLineCommand = cobra.Command{
-	Use:   "line ID LINE",
-	Short: "Correct lines",
 	Args:  cobra.MinimumNArgs(2),
-	RunE:  doCorrectLine,
+	RunE:  doCorrect,
 }
 
-func doCorrectLine(cmd *cobra.Command, args []string) error {
-	return correctLine(os.Stdout, args[0], strings.Join(args[1:], " "))
-}
-
-func correctLine(out io.Writer, id, correction string) error {
-	var bid, pid, lid int
-	if err := scanf(id, "%d:%d:%d", &bid, &pid, &lid); err != nil {
-		return fmt.Errorf("invalid line id: %s", id)
+func doCorrect(cmd *cobra.Command, args []string) error {
+	id, correction := args[0], strings.Join(args[1:], " ")
+	if bid, pid, lid, wid, ok := wordID(id); ok {
+		return correctWord(os.Stdout, bid, pid, lid, wid, correction)
 	}
+	if bid, pid, lid, ok := lineID(id); ok {
+		return correctLine(os.Stdout, bid, pid, lid, correction)
+	}
+	return fmt.Errorf("invalid id: %q", id)
+}
+
+func correctLine(out io.Writer, bid, pid, lid int, correction string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
@@ -41,22 +39,7 @@ func correctLine(out io.Writer, id, correction string) error {
 	return cmd.print()
 }
 
-var correctWordCommand = cobra.Command{
-	Use:   "word ID WORD",
-	Short: "Correct words",
-	Args:  cobra.ExactArgs(2),
-	RunE:  doCorrectWord,
-}
-
-func doCorrectWord(cmd *cobra.Command, args []string) error {
-	return correctWord(os.Stdout, args[0], args[1])
-}
-
-func correctWord(out io.Writer, id, correction string) error {
-	var bid, pid, lid, wid int
-	if err := scanf(id, "%d:%d:%d:%d", &bid, &pid, &lid, &wid); err != nil {
-		return fmt.Errorf("invalid line id: %s", id)
-	}
+func correctWord(out io.Writer, bid, pid, lid, wid int, correction string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
