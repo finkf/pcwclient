@@ -96,7 +96,7 @@ func pageID(id string) (bid, pid int, ok bool) {
 }
 
 func bookID(id string) (bid int, ok bool) {
-	if err := scanf(id, "%d:%d", &bid); err != nil {
+	if err := scanf(id, "%d", &bid); err != nil {
 		return 0, false
 	}
 	return bid, true
