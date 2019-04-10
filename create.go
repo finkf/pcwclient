@@ -82,12 +82,12 @@ func createBook(p string, out io.Writer) error {
 	})
 	cmd.do(func() error {
 		book, err := cmd.client.PostZIP(zip)
-		cmd.data = book
+		cmd.add(book)
 		return err
 	})
 	cmd.do(func() error {
 		newBook := api.Book{
-			ProjectID:   cmd.data.(*api.Book).ProjectID,
+			ProjectID:   cmd.data[0].(*api.Book).ProjectID,
 			Title:       bookTitle,
 			Author:      bookAuthor,
 			Description: bookDescription,
@@ -96,12 +96,10 @@ func createBook(p string, out io.Writer) error {
 			ProfilerURL: bookProfilerURL,
 		}
 		book, err := cmd.client.PostBook(newBook)
-		cmd.data = book
+		cmd.data[0] = book
 		return err
 	})
-	return cmd.output(func() error {
-		return infoBook(out, *cmd.data.(*api.Book))
-	})
+	return cmd.print()
 }
 
 func openAsZIP(p string) (io.ReadCloser, error) {
@@ -131,11 +129,11 @@ func openAsZIP(p string) (io.ReadCloser, error) {
 			internalPath += "/"
 			header.Name = internalPath
 			_, e := w.CreateHeader(header)
-			log.Printf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
+			log.Debugf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
 			return e
 		}
 		// copy file
-		log.Printf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
+		log.Debugf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
 		header.Method = zip.Deflate
 		// open file
 		in, e := os.Open(p)
@@ -182,10 +180,8 @@ func createUser(out io.Writer) error {
 			Password: userPassword,
 		}
 		u, err := cmd.client.PostUser(req)
-		cmd.data = u
+		cmd.add(u)
 		return err
 	})
-	return cmd.output(func() error {
-		return infoUser(out, cmd.data.(api.User))
-	})
+	return cmd.print()
 }

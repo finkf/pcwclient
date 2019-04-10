@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -11,62 +12,63 @@ import (
 )
 
 var correctCommand = cobra.Command{
-	Use:   "correct",
+	Use:   "correct [ID CORRECTION...]",
 	Short: "Correct lines or words",
+	Args: func(cmd *cobra.Command, args []string) error {
+		// zero or 2+ args
+		if len(args) == 1 {
+			return fmt.Errorf("expected exactly 0 or at least 2 args")
+		}
+		return nil
+	},
+	RunE: doCorrect,
 }
 
-var correctLineCommand = cobra.Command{
-	Use:   "line ID LINE",
-	Short: "Correct lines",
-	Args:  cobra.MinimumNArgs(2),
-	RunE:  doCorrectLine,
-}
-
-func doCorrectLine(cmd *cobra.Command, args []string) error {
-	return correctLine(os.Stdout, args[0], strings.Join(args[1:], " "))
-}
-
-func correctLine(out io.Writer, id, correction string) error {
-	var bid, pid, lid int
-	if err := scanf(id, "%d:%d:%d", &bid, &pid, &lid); err != nil {
-		return fmt.Errorf("invalid line id: %s", id)
+func doCorrect(cmd *cobra.Command, args []string) error {
+	if len(args) >= 2 {
+		return correct(os.Stdout, args[0], strings.Join(args[1:], " "))
 	}
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		args := strings.Fields(s.Text())
+		if len(args) < 2 {
+			return fmt.Errorf("invalid input line: %q", s.Text())
+		}
+		if err := correct(os.Stdout, args[0], strings.Join(args[1:], " ")); err != nil {
+			return err
+		}
+	}
+	return s.Err()
+}
+
+func correct(out io.Writer, id, correction string) error {
+	if bid, pid, lid, wid, ok := wordID(id); ok {
+		return correctWord(os.Stdout, bid, pid, lid, wid, correction)
+	}
+	if bid, pid, lid, ok := lineID(id); ok {
+		return correctLine(os.Stdout, bid, pid, lid, correction)
+	}
+	return fmt.Errorf("invalid id: %q", id)
+}
+
+func correctLine(out io.Writer, bid, pid, lid int, correction string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
 		line, err := cmd.client.PostLine(bid, pid, lid, cor)
-		cmd.data = line
+		cmd.add(line)
 		return err
 	})
-	return cmd.output(func() error {
-		return cmd.print(cmd.data)
-	})
+	return cmd.print()
 }
 
-var correctWordCommand = cobra.Command{
-	Use:   "word ID WORD",
-	Short: "Correct words",
-	Args:  cobra.ExactArgs(2),
-	RunE:  doCorrectWord,
-}
-
-func doCorrectWord(cmd *cobra.Command, args []string) error {
-	return correctWord(os.Stdout, args[0], args[1])
-}
-
-func correctWord(out io.Writer, id, correction string) error {
-	var bid, pid, lid, wid int
-	if err := scanf(id, "%d:%d:%d:%d", &bid, &pid, &lid, &wid); err != nil {
-		return fmt.Errorf("invalid line id: %s", id)
-	}
+func correctWord(out io.Writer, bid, pid, lid, wid int, correction string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
 		cor := api.Correction{Correction: correction}
 		word, err := cmd.client.PostToken(bid, pid, lid, wid, cor)
-		cmd.data = word
+		cmd.add(word)
 		return err
 	})
-	return cmd.output(func() error {
-		return cmd.print(cmd.data)
-	})
+	return cmd.print()
 }
