@@ -12,7 +12,7 @@ import (
 )
 
 var correctCommand = cobra.Command{
-	Use:   "correct ID CORRECTION...",
+	Use:   "correct [ID CORRECTION...]",
 	Short: "Correct lines or words",
 	Args: func(cmd *cobra.Command, args []string) error {
 		// zero or 2+ args
