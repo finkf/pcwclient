@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
@@ -13,12 +14,34 @@ import (
 var correctCommand = cobra.Command{
 	Use:   "correct ID CORRECTION...",
 	Short: "Correct lines or words",
-	Args:  cobra.MinimumNArgs(2),
-	RunE:  doCorrect,
+	Args: func(cmd *cobra.Command, args []string) error {
+		// zero or 2+ args
+		if len(args) == 1 {
+			return fmt.Errorf("expected exactly 0 or at least 2 args")
+		}
+		return nil
+	},
+	RunE: doCorrect,
 }
 
 func doCorrect(cmd *cobra.Command, args []string) error {
-	id, correction := args[0], strings.Join(args[1:], " ")
+	if len(args) >= 2 {
+		return correct(os.Stdout, args[0], strings.Join(args[1:], " "))
+	}
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		args := strings.Split(s.Text(), " \t")
+		if len(args) < 2 {
+			return fmt.Errorf("invalid input line: %q", s.Text())
+		}
+		if err := correct(os.Stdout, args[0], strings.Join(args[1:], " ")); err != nil {
+			return err
+		}
+	}
+	return s.Err()
+}
+
+func correct(out io.Writer, id, correction string) error {
 	if bid, pid, lid, wid, ok := wordID(id); ok {
 		return correctWord(os.Stdout, bid, pid, lid, wid, correction)
 	}
