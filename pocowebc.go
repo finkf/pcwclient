@@ -76,6 +76,34 @@ func scanf(str, format string, args ...interface{}) error {
 	return err
 }
 
+func wordID(id string) (bid, pid, lid, wid int, ok bool) {
+	if err := scanf(id, "%d:%d:%d:%d", &bid, &pid, &lid, &wid); err != nil {
+		return 0, 0, 0, 0, false
+	}
+	return bid, pid, lid, wid, true
+}
+
+func lineID(id string) (bid, pid, lid int, ok bool) {
+	if err := scanf(id, "%d:%d:%d", &bid, &pid, &lid); err != nil {
+		return 0, 0, 0, false
+	}
+	return bid, pid, lid, true
+}
+
+func pageID(id string) (bid, pid int, ok bool) {
+	if err := scanf(id, "%d:%d", &bid, &pid); err != nil {
+		return 0, 0, false
+	}
+	return bid, pid, true
+}
+
+func bookID(id string) (bid int, ok bool) {
+	if err := scanf(id, "%d:%d", &bid); err != nil {
+		return 0, false
+	}
+	return bid, true
+}
+
 type command struct {
 	client *api.Client
 	data   []interface{}

@@ -32,20 +32,19 @@ func printIDs(_ *cobra.Command, args []string) error {
 
 func getByID(cmd *command, id string) {
 	cmd.do(func() error {
-		var bid, pid, lid, wid int
-		if err := scanf(id, "%d:%d:%d:%d", &bid, &pid, &lid, &wid); err == nil {
+		if bid, pid, lid, wid, ok := wordID(id); ok {
 			getWord(cmd, bid, pid, lid, wid)
 			return nil
 		}
-		if err := scanf(id, "%d:%d:%d", &bid, &pid, &lid); err == nil {
+		if bid, pid, lid, ok := lineID(id); ok {
 			getLine(cmd, bid, pid, lid)
 			return nil
 		}
-		if err := scanf(id, "%d:%d", &bid, &pid); err == nil {
+		if bid, pid, ok := pageID(id); ok {
 			getPage(cmd, bid, pid)
 			return nil
 		}
-		if err := scanf(id, "%d", &bid); err == nil {
+		if bid, ok := bookID(id); ok {
 			getPages(cmd, bid)
 			return nil
 		}
