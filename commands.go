@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,10 @@ import (
 func init() {
 	searchCommand.Flags().BoolVarP(&searchErrorPattern, "error-pattern", "e",
 		false, "search for error patterns")
+	splitCommand.Flags().BoolVarP(&splitRandom, "random", "r",
+		false, "split random")
+	splitCommand.Flags().IntVarP(&splitN, "number", "n",
+		10, "number of splits")
 }
 
 var loginCommand = cobra.Command{
@@ -143,6 +148,77 @@ func download(out io.Writer, id string) error {
 		n, err := io.Copy(cmd.out, r)
 		log.Debugf("wrote %d bytes", n)
 		return err
+	})
+	return cmd.err
+}
+
+var (
+	splitRandom bool
+	splitN      int
+)
+
+var splitCommand = cobra.Command{
+	Use:   "split ID",
+	Short: "split a book into multiple projects",
+	RunE:  doSplit,
+	Args:  cobra.ExactArgs(1),
+}
+
+func doSplit(cmd *cobra.Command, args []string) error {
+	return split(os.Stdout, args[0])
+}
+
+func split(out io.Writer, id string) error {
+	bid, ok := bookID(id)
+	if !ok {
+		return fmt.Errorf("invalid book ID: %s", id)
+	}
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		books, err := cmd.client.Split(bid, splitN, splitRandom)
+		cmd.add(books)
+		return err
+	})
+	return cmd.print()
+}
+
+var assignCommand = cobra.Command{
+	Use:   "assign BOOK-ID USER-ID",
+	Short: "assign a book to another user",
+	Args:  exactlyNIDs(2),
+	RunE:  doAssign,
+}
+
+func doAssign(cmd *cobra.Command, args []string) error {
+	bid, _ := strconv.Atoi(args[0])
+	uid, _ := strconv.Atoi(args[1])
+	return assign(os.Stdout, bid, uid)
+}
+
+func assign(out io.Writer, bid, uid int) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		return cmd.client.Assign(bid, uid)
+	})
+	return cmd.err
+}
+
+var finishCommand = cobra.Command{
+	Use:   "finish ID",
+	Short: "finish a book and reassign it to its original user",
+	Args:  exactlyNIDs(1),
+	RunE:  doFinish,
+}
+
+func doFinish(cmd *cobra.Command, args []string) error {
+	bid, _ := strconv.Atoi(args[0])
+	return finish(os.Stdout, bid)
+}
+
+func finish(out io.Writer, bid int) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		return cmd.client.Finish(bid)
 	})
 	return cmd.err
 }

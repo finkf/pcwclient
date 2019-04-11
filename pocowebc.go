@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -37,6 +38,9 @@ func init() {
 	mainCommand.AddCommand(&searchCommand)
 	mainCommand.AddCommand(&correctCommand)
 	mainCommand.AddCommand(&downloadCommand)
+	mainCommand.AddCommand(&splitCommand)
+	mainCommand.AddCommand(&assignCommand)
+	mainCommand.AddCommand(&finishCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	listCommand.AddCommand(&listUsersCommand)
@@ -68,6 +72,21 @@ func auth() string {
 		return authToken
 	}
 	return os.Getenv("POCOWEBC_AUTH")
+}
+
+func exactlyNIDs(n int) func(cmd *cobra.Command, args []string) error {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) != n {
+			return fmt.Errorf("expected exactly %d arguments", n)
+		}
+		for _, arg := range args {
+			_, err := strconv.Atoi(arg)
+			if err != nil {
+				return fmt.Errorf("not an ID: %s", arg)
+			}
+		}
+		return nil
+	}
 }
 
 func scanf(str, format string, args ...interface{}) error {
@@ -318,7 +337,7 @@ func (cmd *command) printBooks(books *api.Books) error {
 func toStrings(xs []int) []string {
 	res := make([]string, len(xs))
 	for i, x := range xs {
-		res[i] = string(x)
+		res[i] = fmt.Sprintf("%d", x)
 	}
 	return res
 }
