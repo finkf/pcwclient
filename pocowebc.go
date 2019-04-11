@@ -157,7 +157,10 @@ func (cmd *command) do(f func() error) {
 	if cmd.err != nil {
 		return
 	}
-	cmd.err = f()
+	err := f()
+	if err != nil {
+		cmd.err = err
+	}
 }
 
 func (cmd *command) print() error {
