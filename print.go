@@ -25,31 +25,25 @@ var printCommand = cobra.Command{
 func printIDs(_ *cobra.Command, args []string) error {
 	cmd := newCommand(os.Stdout)
 	for _, id := range args {
-		getByID(&cmd, id)
-	}
-	return cmd.print()
-}
-
-func getByID(cmd *command, id string) {
-	cmd.do(func() error {
 		if bid, pid, lid, wid, ok := wordID(id); ok {
-			getWord(cmd, bid, pid, lid, wid)
-			return nil
+			getWord(&cmd, bid, pid, lid, wid)
+			continue
 		}
 		if bid, pid, lid, ok := lineID(id); ok {
-			getLine(cmd, bid, pid, lid)
-			return nil
+			getLine(&cmd, bid, pid, lid)
+			continue
 		}
 		if bid, pid, ok := pageID(id); ok {
-			getPage(cmd, bid, pid)
-			return nil
+			getPage(&cmd, bid, pid)
+			continue
 		}
 		if bid, ok := bookID(id); ok {
-			getPages(cmd, bid)
-			return nil
+			getPages(&cmd, bid)
+			continue
 		}
 		return fmt.Errorf("invalid id: %s", id)
-	})
+	}
+	return cmd.print()
 }
 
 func getPages(cmd *command, bid int) {
