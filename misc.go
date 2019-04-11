@@ -222,3 +222,33 @@ func finish(out io.Writer, bid int) error {
 	})
 	return cmd.err
 }
+
+var deleteCommand = cobra.Command{
+	Use:   "delete IDS...",
+	Short: "delete a book, page or line",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  doDelete,
+}
+
+func doDelete(_ *cobra.Command, args []string) error {
+	cmd := newCommand(os.Stdout)
+	for _, id := range args {
+		if bid, pid, lid, ok := lineID(id); ok {
+			cmd.do(func() error {
+				return cmd.client.DeleteLine(bid, pid, lid)
+			})
+			continue
+		}
+		if bid, pid, ok := pageID(id); ok {
+			cmd.do(func() error {
+				return cmd.client.DeletePage(bid, pid)
+			})
+			continue
+		}
+		if _, ok := bookID(id); ok {
+			return fmt.Errorf("cannot delete book: not implemented")
+		}
+		return fmt.Errorf("cannot delete: invalid id: %s", id)
+	}
+	return nil
+}

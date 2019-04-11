@@ -48,6 +48,7 @@ func init() {
 	mainCommand.AddCommand(&splitCommand)
 	mainCommand.AddCommand(&assignCommand)
 	mainCommand.AddCommand(&finishCommand)
+	mainCommand.AddCommand(&deleteCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	listCommand.AddCommand(&listUsersCommand)
