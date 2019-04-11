@@ -16,17 +16,24 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// various command line flags
 var (
-	mainCommand = &cobra.Command{
-		Use:   "pocowebc",
-		Short: "command line client for pocoweb",
-	}
 	debug        = false
 	jsonOutput   = false
 	formatString = ""
 	authToken    = ""
 	pocowebURL   = ""
 )
+
+var mainCommand = &cobra.Command{
+	Use:   "pocowebc",
+	Short: "command line client for pocoweb",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		if debug {
+			log.SetLevel(log.DebugLevel)
+		}
+	},
+}
 
 func init() {
 	mainCommand.AddCommand(&listCommand)
@@ -52,7 +59,7 @@ func init() {
 		"output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
 		"enable debug output")
-	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", url(),
+	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", host(),
 		"set pocoweb url (env: POCOWEBC_URL)")
 	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "",
 		"set output format")
@@ -60,7 +67,7 @@ func init() {
 		"set auth token (env: POCOWEBC_AUTH)")
 }
 
-func url() string {
+func host() string {
 	if pocowebURL != "" {
 		return pocowebURL
 	}
@@ -130,15 +137,12 @@ type command struct {
 }
 
 func newCommand(out io.Writer) command {
-	if debug {
-		log.SetLevel(log.DebugLevel)
-	}
 	auth := auth()
 	if auth == "" {
 		return command{err: fmt.Errorf("missing login information: " +
 			"use --auth or set POCOWEBC_AUTH environment variable")}
 	}
-	return command{client: api.Authenticate(url(), auth), out: out}
+	return command{client: api.Authenticate(host(), auth), out: out}
 }
 
 func (cmd *command) add(x interface{}) {

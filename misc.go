@@ -36,7 +36,7 @@ func login(out io.Writer, user, password string) error {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	client, err := api.Login(url(), user, password)
+	client, err := api.Login(host(), user, password)
 	cmd := command{client: client, err: err, out: out}
 	if err == nil {
 		cmd.add(client.Session)
@@ -55,7 +55,7 @@ func runVersion(cmd *cobra.Command, args []string) error {
 }
 
 func version(out io.Writer) error {
-	cmd := newCommand(out)
+	cmd := command{out: out, client: api.NewClient(host())}
 	cmd.do(func() error {
 		version, err := cmd.client.GetAPIVersion()
 		cmd.add(version)
