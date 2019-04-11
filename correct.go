@@ -54,8 +54,9 @@ func correct(out io.Writer, id, correction string) error {
 func correctLine(out io.Writer, bid, pid, lid int, correction string) error {
 	cmd := newCommand(out)
 	cmd.do(func() error {
-		cor := api.Correction{Correction: correction}
-		line, err := cmd.client.PostLine(bid, pid, lid, cor)
+		line, err := cmd.client.PostLine(bid, pid, lid, api.Correction{
+			Correction: correction,
+		})
 		cmd.add(line)
 		return err
 	})
