@@ -14,4 +14,4 @@ require (
 	golang.org/x/sys v0.0.0-20190410235845-0ad05ae3009d // indirect
 )
 
-// replace github.com/finkf/pcwgo/api v0.4.4 => ../pcwgo/api
+// replace github.com/finkf/pcwgo/api => ../pcwgo/api
