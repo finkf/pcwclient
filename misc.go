@@ -44,6 +44,21 @@ func login(out io.Writer, user, password string) error {
 	return cmd.print()
 }
 
+var logoutCommand = cobra.Command{
+	Use:   "logout",
+	Short: "logout from pocoweb",
+	RunE:  runLogout,
+	Args:  cobra.NoArgs, //ExactArgs(0),
+}
+
+func runLogout(cmd *cobra.Command, args []string) error {
+	cmdx := newCommand(os.Stdout)
+	cmdx.do(func() error {
+		return cmdx.client.Logout()
+	})
+	return cmdx.err
+}
+
 var versionCommand = cobra.Command{
 	Use:   "version",
 	Short: "get version information",

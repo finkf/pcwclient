@@ -39,6 +39,7 @@ func init() {
 	mainCommand.AddCommand(&listCommand)
 	mainCommand.AddCommand(&createCommand)
 	mainCommand.AddCommand(&loginCommand)
+	mainCommand.AddCommand(&logoutCommand)
 	mainCommand.AddCommand(&printCommand)
 	mainCommand.AddCommand(&versionCommand)
 	mainCommand.AddCommand(&rawCommand)
