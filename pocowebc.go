@@ -56,6 +56,7 @@ func init() {
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
 
+	mainCommand.SilenceUsage = true
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
 		"output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
