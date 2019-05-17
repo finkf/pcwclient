@@ -1,13 +1,9 @@
 package main // import "github.com/finkf/pocowebc"
 
-import (
-	"fmt"
-	"os"
-)
+import log "github.com/sirupsen/logrus"
 
 func main() {
 	if err := mainCommand.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "[error] %v\n", err)
-		os.Exit(1)
+		log.Fatalf("[error] %v\n", err)
 	}
 }
