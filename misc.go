@@ -36,11 +36,20 @@ func login(out io.Writer, user, password string) error {
 	if debug {
 		log.SetLevel(log.DebugLevel)
 	}
-	client, err := api.Login(host(), user, password)
-	cmd := command{client: client, err: err, out: out}
-	if err == nil {
-		cmd.add(client.Session)
+	url := getURL()
+	if url == "" {
+		url = loadConfig().URL
+		if url == "" {
+			return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
+		}
 	}
+	client, err := api.Login(url, user, password)
+	cmd := command{client: client, err: err, out: out}
+	cmd.do(func() error {
+		saveConfig(&config{URL: url, Auth: client.Session.Auth})
+		cmd.add(client.Session)
+		return nil
+	})
 	return cmd.print()
 }
 
@@ -70,7 +79,14 @@ func runVersion(cmd *cobra.Command, args []string) error {
 }
 
 func version(out io.Writer) error {
-	cmd := command{out: out, client: api.NewClient(host())}
+	url := getURL()
+	if url == "" {
+		url = loadConfig().URL
+		if url == "" {
+			return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
+		}
+	}
+	cmd := command{out: out, client: api.NewClient(url)}
 	cmd.do(func() error {
 		version, err := cmd.client.GetAPIVersion()
 		cmd.add(version)

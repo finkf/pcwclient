@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"text/template"
@@ -23,6 +24,8 @@ var (
 	formatString = ""
 	authToken    = ""
 	pocowebURL   = ""
+	configpath   = ""
+	noconfig     = false
 )
 
 var mainCommand = &cobra.Command{
@@ -63,26 +66,18 @@ func init() {
 		"output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
 		"enable debug output")
-	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U", host(),
-		"set pocoweb url (env: POCOWEBC_URL)")
-	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F", "",
-		"set output format")
-	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A", auth(),
-		"set auth token (env: POCOWEBC_AUTH)")
-}
-
-func host() string {
-	if pocowebURL != "" {
-		return pocowebURL
-	}
-	return os.Getenv("POCOWEBC_URL")
-}
-
-func auth() string {
-	if authToken != "" {
-		return authToken
-	}
-	return os.Getenv("POCOWEBC_AUTH")
+	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U",
+		getURL(), "set pocoweb url (env: POCOWEBC_URL)")
+	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F",
+		"", "set output format")
+	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A",
+		getAuth(), "set auth token (env: POCOWEBC_AUTH)")
+	home, _ := os.UserHomeDir()
+	configpath = filepath.Join(home, ".config/pocowebc/config.toml")
+	mainCommand.PersistentFlags().StringVarP(&configpath, "config", "C",
+		configpath, "set auth token (env: POCOWEBC_CONFIG)")
+	mainCommand.PersistentFlags().BoolVarP(&noconfig, "noconfig", "N", false,
+		"do not use configuration file")
 }
 
 func exactlyNIDs(n int) func(cmd *cobra.Command, args []string) error {
@@ -141,12 +136,11 @@ type command struct {
 }
 
 func newCommand(out io.Writer) command {
-	auth := auth()
-	if auth == "" {
-		return command{err: fmt.Errorf("missing login information: " +
-			"use --auth or set POCOWEBC_AUTH environment variable")}
+	config := loadConfig()
+	if config.Auth == "" || config.URL == "" {
+		return command{err: fmt.Errorf("missing login information: see login sub command")}
 	}
-	return command{client: api.Authenticate(host(), auth), out: out}
+	return command{client: api.Authenticate(config.URL, config.Auth), out: out}
 }
 
 func (cmd *command) add(x interface{}) {
