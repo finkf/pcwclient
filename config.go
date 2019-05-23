@@ -45,8 +45,10 @@ func (c *config) load(p string) error {
 // or load the config from auth or url or load the config
 // using POCOWEBC_URL and POCOWEBC_AUTH environment variables.
 func loadConfig() *config {
+	url := getURL()
+	auth := getAuth()
 	if noconfig {
-		return &config{URL: getURL(), Auth: getAuth()}
+		return &config{URL: url, Auth: auth}
 	}
 	c := &config{}
 	var path string
@@ -58,7 +60,13 @@ func loadConfig() *config {
 	}
 	if err := c.load(path); err != nil {
 		log.Errorf("cannot open config: %v", err)
-		return &config{URL: getURL(), Auth: getAuth()}
+		return &config{URL: url, Auth: auth}
+	}
+	if auth != "" {
+		c.Auth = auth
+	}
+	if url != "" {
+		c.URL = url
 	}
 	return c
 }
