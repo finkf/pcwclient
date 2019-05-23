@@ -72,8 +72,8 @@ func init() {
 		"", "set output format")
 	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A",
 		getAuth(), "set auth token (env: POCOWEBC_AUTH)")
-	home, _ := os.UserHomeDir()
-	configpath = filepath.Join(home, ".config/pocowebc/config.toml")
+	config, _ := userConfigDir()
+	configpath = filepath.Join(config, "pocowebc/config.toml")
 	mainCommand.PersistentFlags().StringVarP(&configpath, "config", "C",
 		configpath, "set auth token (env: POCOWEBC_CONFIG)")
 	mainCommand.PersistentFlags().BoolVarP(&noconfig, "noconfig", "N", false,
@@ -126,6 +126,18 @@ func bookID(id string) (bid int, ok bool) {
 		return 0, false
 	}
 	return bid, true
+}
+
+func userConfigDir() (string, error) {
+	config := os.Getenv("XDG_DATA_HOME")
+	if config != "" {
+		return config, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config"), nil
 }
 
 type command struct {
