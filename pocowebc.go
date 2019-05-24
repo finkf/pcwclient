@@ -53,10 +53,15 @@ func init() {
 	mainCommand.AddCommand(&assignCommand)
 	mainCommand.AddCommand(&finishCommand)
 	mainCommand.AddCommand(&deleteCommand)
+	mainCommand.AddCommand(&profileCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	listCommand.AddCommand(&listUsersCommand)
 	listCommand.AddCommand(&listBooksCommand)
+	listCommand.AddCommand(&listPatternsCommand)
+	listCommand.AddCommand(&listSuggestionsCommand)
+	listCommand.AddCommand(&listSuspiciousCommand)
+	listCommand.AddCommand(&listAdaptiveCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
 
@@ -150,7 +155,9 @@ type command struct {
 func newCommand(out io.Writer) command {
 	config := loadConfig()
 	if config.Auth == "" || config.URL == "" {
-		return command{err: fmt.Errorf("missing login information: see login sub command")}
+		return command{
+			err: fmt.Errorf("missing login information: see login sub command"),
+		}
 	}
 	return command{client: api.Authenticate(config.URL, config.Auth), out: out}
 }
@@ -238,6 +245,18 @@ func (cmd *command) printWithIDs(what interface{}) error {
 		return cmd.printUsers(t)
 	case *api.SearchResults:
 		return cmd.printSearchResults(t)
+	case api.Profile:
+		return cmd.printProfile(t)
+	case api.Suggestions:
+		return cmd.printSuggestions(t)
+	case api.SuggestionCounts:
+		return cmd.printSuggestionCounts(t)
+	case api.Patterns:
+		return cmd.printPatterns(t)
+	case api.PatternCounts:
+		return cmd.printPatternCounts(t)
+	case api.AdaptiveTokens:
+		return cmd.printAdaptiveTokens(t)
 	}
 	panic("invalid type to print")
 }
@@ -265,8 +284,8 @@ func (cmd *command) printLine(line *api.Line) error {
 }
 
 func (cmd *command) printWords(words []api.Token) error {
-	for _, word := range words {
-		if err := cmd.printWord(&word); err != nil {
+	for i := range words {
+		if err := cmd.printWord(&words[i]); err != nil {
 			return err
 		}
 	}
@@ -300,10 +319,12 @@ func (cmd *command) printVersion(v api.Version) error {
 }
 
 func (cmd *command) printSearchResults(res *api.SearchResults) error {
-	for _, match := range res.Matches {
-		for _, token := range match.Tokens {
-			if err := printColoredSearchMatch(cmd.out, match.Line, token); err != nil {
-				return err
+	for _, ms := range res.Matches {
+		for _, m := range ms {
+			for _, token := range m.Tokens {
+				if err := printColoredSearchMatch(cmd.out, m.Line, token); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -312,7 +333,15 @@ func (cmd *command) printSearchResults(res *api.SearchResults) error {
 
 func printColoredSearchMatch(out io.Writer, line api.Line, token api.Token) error {
 	c := color.New(color.FgRed)
-	o := strings.Index(line.Cor[token.Offset:], token.Cor) + token.Offset
+	pos := strings.Index(line.Cor[token.Offset:], token.Cor)
+	o := pos + token.Offset
+	if pos == -1 { // try again without the offset (there could be invisible deletions in the line)
+		pos = strings.Index(line.Cor, token.Cor)
+		if pos == -1 {
+			return fmt.Errorf("cannot mark token %q in %q", token.Cor, line.Cor)
+		}
+		o = pos
+	}
 	e := o + len(token.Cor)
 	prefix, match, suffix := line.Cor[0:o], line.Cor[o:e], line.Cor[e:]
 	_, err := fmt.Fprintf(out, "%d:%d:%d:%d %s",
@@ -360,10 +389,85 @@ func toStrings(xs []int) []string {
 }
 
 func (cmd *command) printBook(book *api.Book) error {
-	return cmd.info("%d\t%s\t%s\t%s\t%d\t%s\t%s\t%t\t%s\n",
-		book.ProjectID, book.Author, book.Title, book.Description,
-		book.Year, book.Language, book.ProfilerURL, book.IsBook,
-		strings.Join(toStrings(book.PageIDs), ","))
+	return cmd.info("%d\t%d\t%s\t%s\t%s\t%s\t%d\t%s\t%s\t%t\n",
+		book.BookID, book.ProjectID, book.Author, book.Title,
+		book.Description, book.Status, book.Year, book.Language,
+		book.ProfilerURL, book.IsBook)
+
+}
+
+func (cmd *command) printProfile(profile api.Profile) error {
+	for _, v := range profile.Profile {
+		top := true
+		for _, c := range v.Candidates {
+			err := cmd.info("%d\t%s\t%s\t%d\t%f\t%t\n",
+				profile.BookID, v.OCR, c.Suggestion, c.Distance, c.Weight, top)
+			if err != nil {
+				return err
+			}
+			top = false
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printSuggestions(ss api.Suggestions) error {
+	for _, s := range ss.Suggestions {
+		if err := cmd.printSuggestionsArray("", s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printSuggestionCounts(counts api.SuggestionCounts) error {
+	for k, v := range counts.Counts {
+		err := cmd.info("%d\t%d\t%s\t%d\n", counts.BookID, counts.ProjectID, k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printSuggestionsArray(pre string, suggestions []api.Suggestion) error {
+	for _, s := range suggestions {
+		err := cmd.info("%s%s\t%s\t%s\t%s\t%d\t%f\t%t\n",
+			pre, s.Token, s.Suggestion, s.Modern, s.Dict, s.Distance, s.Weight, s.Top)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printPatterns(patterns api.Patterns) error {
+	for p, v := range patterns.Patterns {
+		if err := cmd.printSuggestionsArray(p+"\t", v); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printPatternCounts(counts api.PatternCounts) error {
+	for k, v := range counts.Counts {
+		err := cmd.info("%d\t%d\t%s\t%d\t%t\n",
+			counts.BookID, counts.ProjectID, k, v, counts.OCR)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (cmd *command) printAdaptiveTokens(at api.AdaptiveTokens) error {
+	for _, t := range at.AdaptiveTokens {
+		if err := cmd.info("%d\t%d\t%s\n", at.BookID, at.ProjectID, t); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (cmd *command) info(format string, args ...interface{}) error {

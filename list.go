@@ -8,6 +8,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var histPatterns bool
+
+func init() {
+	listPatternsCommand.Flags().BoolVarP(&histPatterns, "hist", "H", false,
+		"list historical rewrite patterns")
+}
+
 var listCommand = cobra.Command{
 	Use:   "list",
 	Short: "List various informations",
@@ -101,4 +108,130 @@ func listBooks(out io.Writer) error {
 		return err
 	})
 	return cmd.print()
+}
+
+var listPatternsCommand = cobra.Command{
+	Use:   "patterns ID [QUERY [QUERY...]]",
+	Short: "List patterns for the given book",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  doListPatterns,
+}
+
+func doListPatterns(cmd *cobra.Command, args []string) error {
+	var bid int
+	if err := scanf(args[0], "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
+	}
+	switch len(args) {
+	case 1:
+		return listAllPatterns(os.Stdout, bid)
+	case 2:
+		return listPatterns(os.Stdout, bid, args[1])
+	default:
+		return listPatterns(os.Stdout, bid, args[1], args[2:]...)
+	}
+}
+
+func listAllPatterns(out io.Writer, id int) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		ps, err := cmd.client.GetPatterns(id, !histPatterns)
+		cmd.add(ps)
+		return err
+	})
+	return cmd.print()
+}
+
+func listPatterns(out io.Writer, id int, q string, qs ...string) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		ps, err := cmd.client.QueryPatterns(id, !histPatterns, q, qs...)
+		cmd.add(ps)
+		return err
+	})
+	return cmd.print()
+}
+
+var listSuggestionsCommand = cobra.Command{
+	Use:   "suggestions ID [QUERY [QUERY...]]",
+	Short: "List profiler suggestions for the given book",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  doListSuggestions,
+}
+
+func doListSuggestions(cmd *cobra.Command, args []string) error {
+	var bid int
+	if err := scanf(args[0], "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
+	}
+	switch len(args) {
+	case 1:
+		return listAllSuggestions(os.Stdout, bid)
+	case 2:
+		return listSuggestions(os.Stdout, bid, args[1])
+	default:
+		return listSuggestions(os.Stdout, bid, args[1], args[2:]...)
+	}
+}
+
+func listAllSuggestions(out io.Writer, id int) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		profile, err := cmd.client.GetProfile(id)
+		cmd.add(profile)
+		return err
+	})
+	return cmd.print()
+}
+
+func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
+	cmd := newCommand(out)
+	cmd.do(func() error {
+		suggestions, err := cmd.client.QueryProfile(id, q, qs...)
+		cmd.add(suggestions)
+		return err
+	})
+	return cmd.print()
+}
+
+var listSuspiciousCommand = cobra.Command{
+	Use:   "suspicious ID",
+	Short: "List suspicous words for the given book",
+	Args:  exactlyNIDs(1),
+	RunE:  doListSuspicious,
+}
+
+func doListSuspicious(cmd *cobra.Command, args []string) error {
+	var bid int
+	if err := scanf(args[0], "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
+	}
+	cmdx := newCommand(os.Stdout)
+	cmdx.do(func() error {
+		counts, err := cmdx.client.GetSuspicious(bid)
+		cmdx.add(counts)
+		return err
+	})
+	return cmdx.print()
+}
+
+var listAdaptiveCommand = cobra.Command{
+	Use:   "adaptive ID",
+	Short: "List adaptive tokens for the given book",
+	Args:  exactlyNIDs(1),
+	RunE:  doListAdaptive,
+}
+
+func doListAdaptive(cmd *cobra.Command, args []string) error {
+	var bid int
+	if err := scanf(args[0], "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
+	}
+	cmdx := newCommand(os.Stdout)
+	cmdx.do(func() error {
+		at, err := cmdx.client.GetAdaptiveTokens(bid)
+		cmdx.add(at)
+		return err
+	})
+	return cmdx.print()
 }

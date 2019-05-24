@@ -12,8 +12,14 @@ import (
 )
 
 func init() {
-	searchCommand.Flags().BoolVarP(&searchErrorPattern, "error-pattern", "e",
+	searchCommand.Flags().BoolVarP(&searchPattern, "pattern", "e",
 		false, "search for error patterns")
+	searchCommand.Flags().BoolVarP(&searchPartial, "partial", "p",
+		false, "only search max matches")
+	searchCommand.Flags().IntVarP(&searchMax, "max", "m",
+		100, "set max matches")
+	searchCommand.Flags().IntVarP(&searchSkip, "skip", "s",
+		0, "set skip matches")
 	splitCommand.Flags().BoolVarP(&splitRandom, "random", "r",
 		false, "split random")
 	splitCommand.Flags().IntVarP(&splitN, "number", "n",
@@ -122,25 +128,51 @@ var searchCommand = cobra.Command{
 	Use:   "search ID QUERY",
 	Short: "search for tokens and error patterns",
 	RunE:  runSearch,
-	Args:  cobra.ExactArgs(2),
+	Args:  cobra.MinimumNArgs(2),
 }
 
-var searchErrorPattern bool
+var (
+	searchSkip    int
+	searchMax     int
+	searchPattern bool
+	searchPartial bool
+)
 
 func runSearch(cmd *cobra.Command, args []string) error {
-	return search(os.Stdout, args[0], args[1], searchErrorPattern)
-}
-
-func search(out io.Writer, id, query string, errorPattern bool) error {
-	var bid int
-	if err := scanf(id, "%d", &bid); err != nil {
+	var id int
+	if err := scanf(args[0], "%d", &id); err != nil {
 		return fmt.Errorf("invalid book id: %v", err)
 	}
+	switch len(args) {
+	case 2:
+		return search(os.Stdout, id, searchPattern, args[1])
+	default:
+		return search(os.Stdout, id, searchPattern, args[1], args[2:]...)
+	}
+}
+
+func search(out io.Writer, id int, ep bool, q string, qs ...string) error {
 	cmd := newCommand(out)
+	cmd.client.Skip = searchSkip
+	cmd.client.Max = searchMax
 	cmd.do(func() error {
-		res, err := cmd.client.Search(bid, query, errorPattern)
-		cmd.add(res)
-		return err
+		for {
+			var res *api.SearchResults
+			var err error
+			if ep {
+				res, err = cmd.client.SearchErrorPatterns(id, q, qs...)
+			} else {
+				res, err = cmd.client.Search(id, q, qs...)
+			}
+			if err != nil {
+				return err
+			}
+			cmd.add(res)
+			if searchPartial || len(res.Matches) == 0 {
+				return nil
+			}
+			cmd.client.Skip += cmd.client.Max
+		}
 	})
 	return cmd.print()
 }

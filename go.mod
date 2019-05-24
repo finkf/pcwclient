@@ -1,15 +1,11 @@
 module github.com/finkf/pocowebc
 
 require (
+	github.com/BurntSushi/toml v0.3.1
 	github.com/fatih/color v1.7.0
-	github.com/finkf/pcwgo/api v0.6.1
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/mattn/go-colorable v0.1.1 // indirect
-	github.com/mattn/go-isatty v0.0.7 // indirect
-	github.com/sirupsen/logrus v1.4.1
-	github.com/spf13/cobra v0.0.3
-	github.com/spf13/pflag v1.0.3 // indirect
-	golang.org/x/sys v0.0.0-20190516110030-61b9204099cb // indirect
+	github.com/finkf/pcwgo/api v0.7.0
+	github.com/finkf/pcwgo/db v0.10.0
+	github.com/mattn/go-colorable v0.1.2 // indirect
+	github.com/sirupsen/logrus v1.4.2
+	github.com/spf13/cobra v0.0.4
 )
-
-// replace github.com/finkf/pcwgo/api => ../pcwgo/api
