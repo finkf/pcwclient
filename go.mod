@@ -43,5 +43,3 @@ require (
 	google.golang.org/genproto v0.0.0-20190522204451-c2c4e71fbf69 // indirect
 	honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc // indirect
 )
-
-replace github.com/finkf/pcwgo/api => ../pcwgo/api

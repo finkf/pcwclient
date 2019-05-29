@@ -35,6 +35,8 @@ github.com/finkf/gofiler v0.1.1/go.mod h1:mn58Ujgxq/pYa2j6btgXzkY2dFjg8FNDe8rwOq
 github.com/finkf/pcwgo/api v0.6.2/go.mod h1:eFwTXCRPJKiWI3xLh6ve9onvHygoKnJDCOOnEF7KnbY=
 github.com/finkf/pcwgo/api v0.7.0 h1:KO6Vpb4OEQPXHEyY4wQmPKwCv+wTLBIhZD2awf5VY24=
 github.com/finkf/pcwgo/api v0.7.0/go.mod h1:M3+HfYb4xRDhrMCfTYIeQQuv9TTdqCLe6j9+Yn0moeM=
+github.com/finkf/pcwgo/api v0.8.0 h1:OhPv2/zFG5hzwBlOvPQz4c+qWIbyNG7WpezqfLOB8QI=
+github.com/finkf/pcwgo/api v0.8.0/go.mod h1:M3+HfYb4xRDhrMCfTYIeQQuv9TTdqCLe6j9+Yn0moeM=
 github.com/finkf/pcwgo/db v0.10.0 h1:1Qzhm6e9C6T+JJON9tdJMA+QvbaAu/G7ow9EhV4hbHs=
 github.com/finkf/pcwgo/db v0.10.0/go.mod h1:vHJwIi9WfuJVZGaILBy21EY8pNbgSnnXrfbRoY0J9Q4=
 github.com/finkf/pcwgo/db v0.11.0 h1:ZJR0peezzlfSomTnzmt4ENXIGRQXDKH7CcZJaroF6Tc=

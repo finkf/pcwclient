@@ -49,8 +49,8 @@ func waitForJobToFinish(cmd command, jobID int) {
 }
 
 var startProfileCommand = cobra.Command{
-	Use:   "profile ID [QUERY [QUERY...]]",
-	Short: "List user information",
+	Use:   "profile ID",
+	Short: "Start to profile book ID",
 	Args:  exactlyNIDs(1),
 	RunE:  doProfile,
 }
@@ -69,6 +69,30 @@ func profile(out io.Writer, id int) error {
 	var jobID int
 	cmd.do(func() error {
 		job, err := cmd.client.PostProfile(id)
+		jobID = job.ID
+		return err
+	})
+	waitForJobToFinish(cmd, jobID)
+	return cmd.print()
+}
+
+var startELCommand = cobra.Command{
+	Use:   "el ID",
+	Short: "Create extended lexicon for book ID",
+	Args:  exactlyNIDs(1),
+	RunE:  doEL,
+}
+
+func doEL(_ *cobra.Command, args []string) error {
+	var bid int
+	if err := scanf(args[0], "%d", &bid); err != nil {
+		return fmt.Errorf("invalid book id: %v", err)
+	}
+	cmd := newCommand(os.Stdout)
+	// start profiling
+	var jobID int
+	cmd.do(func() error {
+		job, err := cmd.client.PostExtendedLexicon(bid)
 		jobID = job.ID
 		return err
 	})

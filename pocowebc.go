@@ -66,6 +66,7 @@ func init() {
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
 	startCommand.AddCommand(&startProfileCommand)
+	startCommand.AddCommand(&startELCommand)
 	mainCommand.SilenceUsage = true
 	mainCommand.SilenceErrors = true
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
