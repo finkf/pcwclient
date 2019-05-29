@@ -28,6 +28,26 @@ func init() {
 		"set the number of seconds to sleep between checks if the job has finished")
 }
 
+func waitForJobToFinish(cmd command, jobID int) {
+	cmd.do(func() error {
+		for !startNoWait {
+			time.Sleep(time.Duration(startSleepS) * time.Second)
+			status, err := cmd.client.GetJobStatus(jobID)
+			if err != nil {
+				return err
+			}
+			log.Debugf("status: %s", status.StatusName)
+			if status.StatusID == db.StatusIDFailed {
+				return fmt.Errorf("job %d failed", status.JobID)
+			}
+			if status.StatusID == db.StatusIDDone {
+				return nil
+			}
+		}
+		return nil
+	})
+}
+
 var startProfileCommand = cobra.Command{
 	Use:   "profile ID [QUERY [QUERY...]]",
 	Short: "List user information",
@@ -52,23 +72,6 @@ func profile(out io.Writer, id int) error {
 		jobID = job.ID
 		return err
 	})
-	// wait
-	cmd.do(func() error {
-		for !startNoWait {
-			time.Sleep(time.Duration(startSleepS) * time.Second)
-			status, err := cmd.client.GetJobStatus(jobID)
-			if err != nil {
-				return err
-			}
-			log.Debugf("status: %s", status.StatusName)
-			if status.StatusID == db.StatusIDFailed {
-				return fmt.Errorf("job %d failed", status.JobID)
-			}
-			if status.StatusID == db.StatusIDDone {
-				return nil
-			}
-		}
-		return nil
-	})
+	waitForJobToFinish(cmd, jobID)
 	return cmd.print()
 }
