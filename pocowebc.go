@@ -53,7 +53,7 @@ func init() {
 	mainCommand.AddCommand(&assignCommand)
 	mainCommand.AddCommand(&finishCommand)
 	mainCommand.AddCommand(&deleteCommand)
-	mainCommand.AddCommand(&profileCommand)
+	mainCommand.AddCommand(&startCommand)
 	listCommand.AddCommand(&listUserCommand)
 	listCommand.AddCommand(&listBookCommand)
 	listCommand.AddCommand(&listUsersCommand)
@@ -62,9 +62,10 @@ func init() {
 	listCommand.AddCommand(&listSuggestionsCommand)
 	listCommand.AddCommand(&listSuspiciousCommand)
 	listCommand.AddCommand(&listAdaptiveCommand)
+	listCommand.AddCommand(&listELCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
-
+	startCommand.AddCommand(&startProfileCommand)
 	mainCommand.SilenceUsage = true
 	mainCommand.SilenceErrors = true
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,

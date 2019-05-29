@@ -12,18 +12,23 @@ import (
 )
 
 var (
-	profileNoWait bool
-	sleepS        int
+	startNoWait bool
+	startSleepS int
 )
 
-func init() {
-	profileCommand.Flags().BoolVarP(&profileNoWait, "nowait", "n", false,
-		"do not wait for the profiling to finish")
-	profileCommand.Flags().IntVarP(&sleepS, "sleeps", "s", 2,
-		"set the number of seconds to sleep between checks")
+var startCommand = cobra.Command{
+	Use:   "start",
+	Short: "Start various jobs",
 }
 
-var profileCommand = cobra.Command{
+func init() {
+	startCommand.PersistentFlags().BoolVarP(&startNoWait, "nowait", "n", false,
+		"do not wait for the job to finish")
+	startCommand.PersistentFlags().IntVarP(&startSleepS, "sleep", "s", 5,
+		"set the number of seconds to sleep between checks if the job has finished")
+}
+
+var startProfileCommand = cobra.Command{
 	Use:   "profile ID [QUERY [QUERY...]]",
 	Short: "List user information",
 	Args:  exactlyNIDs(1),
@@ -41,14 +46,17 @@ func doProfile(cmd *cobra.Command, args []string) error {
 func profile(out io.Writer, id int) error {
 	cmd := newCommand(out)
 	// start profiling
+	var jobID int
 	cmd.do(func() error {
-		return cmd.client.PostProfile(id)
+		job, err := cmd.client.PostProfile(id)
+		jobID = job.ID
+		return err
 	})
 	// wait
 	cmd.do(func() error {
-		for !profileNoWait {
-			time.Sleep(time.Duration(sleepS) * time.Second)
-			status, err := cmd.client.GetJobStatus(id)
+		for !startNoWait {
+			time.Sleep(time.Duration(startSleepS) * time.Second)
+			status, err := cmd.client.GetJobStatus(jobID)
 			if err != nil {
 				return err
 			}
