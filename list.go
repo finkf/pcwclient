@@ -4,45 +4,28 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"github.com/finkf/pcwgo/api"
 	"github.com/spf13/cobra"
 )
 
-var histPatterns bool
+var (
+	histPatterns    bool
+	listCharsFilter string
+)
 
 func init() {
 	listPatternsCommand.Flags().BoolVarP(&histPatterns, "hist", "H", false,
 		"list historical rewrite patterns")
+	listCharsCommand.Flags().StringVarP(&listCharsFilter,
+		"filter", "f", "A-Za-z0-9", "set filter characters")
+
 }
 
 var listCommand = cobra.Command{
 	Use:   "list",
 	Short: "List various informations",
-}
-
-var listUserCommand = cobra.Command{
-	Use:   "user ID",
-	Short: "List user information",
-	Args:  cobra.ExactArgs(1),
-	RunE:  doListUser,
-}
-
-func doListUser(cmd *cobra.Command, args []string) error {
-	return listUser(os.Stdout, args[0])
-}
-
-func listUser(out io.Writer, id string) error {
-	var uid int
-	if err := scanf(id, "%d", &uid); err != nil {
-		return fmt.Errorf("invalid user id: %v", err)
-	}
-	cmd := newCommand(out)
-	cmd.do(func() error {
-		user, err := cmd.client.GetUser(int64(uid))
-		cmd.add(user)
-		return err
-	})
-	return cmd.print()
 }
 
 var listUsersCommand = cobra.Command{
@@ -52,62 +35,67 @@ var listUsersCommand = cobra.Command{
 }
 
 func doListUsers(cmd *cobra.Command, args []string) error {
-	return listUsers(os.Stdout)
-}
-
-func listUsers(out io.Writer) error {
-	cmd := newCommand(out)
-	cmd.do(func() error {
-		users, err := cmd.client.GetUsers()
-		cmd.add(users)
-		return err
-	})
-	return cmd.print()
-}
-
-var listBookCommand = cobra.Command{
-	Use:   "book ID",
-	Short: "List book information",
-	Args:  cobra.ExactArgs(1),
-	RunE:  doListBook,
-}
-
-func doListBook(cmd *cobra.Command, args []string) error {
-	return listBook(os.Stdout, args[0])
-}
-
-func listBook(out io.Writer, id string) error {
-	var bid int
-	if err := scanf(id, "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if len(args) == 0 {
+		return listAllUsers(os.Stdout)
 	}
+	return listUsers(os.Stdout, args...)
+}
+
+func listUsers(out io.Writer, ids ...string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		book, err := cmd.client.GetBook(bid)
-		cmd.add(book)
-		return err
+	for _, id := range ids {
+		var uid int
+		if n := parseIDs(id, &uid); n != 1 {
+			return fmt.Errorf("invalid user id: %q", id)
+		}
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			return client.GetUser(int64(uid))
+		})
+	}
+	return cmd.done()
+}
+
+func listAllUsers(out io.Writer) error {
+	cmd := newCommand(out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.GetUsers()
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var listBooksCommand = cobra.Command{
-	Use:   "books",
-	Short: "List information about all books",
+	Use:   "books [ID [IDS...]]",
+	Short: "List book information",
 	RunE:  doListBooks,
 }
 
 func doListBooks(cmd *cobra.Command, args []string) error {
-	return listBooks(os.Stdout)
+	if len(args) == 0 {
+		return listAllBooks(os.Stdout)
+	}
+	return listBooks(os.Stdout, args...)
 }
 
-func listBooks(out io.Writer) error {
+func listBooks(out io.Writer, ids ...string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		books, err := cmd.client.GetBooks()
-		cmd.add(books)
-		return err
+	for _, id := range ids {
+		var bid int
+		if n := parseIDs(id, &bid); n != 1 {
+			return fmt.Errorf("invalid book id: %q", id)
+		}
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			return client.GetBook(bid)
+		})
+	}
+	return cmd.done()
+}
+
+func listAllBooks(out io.Writer) error {
+	cmd := newCommand(out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.GetBooks()
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var listPatternsCommand = cobra.Command{
@@ -119,8 +107,8 @@ var listPatternsCommand = cobra.Command{
 
 func doListPatterns(cmd *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
 	}
 	switch len(args) {
 	case 1:
@@ -134,22 +122,18 @@ func doListPatterns(cmd *cobra.Command, args []string) error {
 
 func listAllPatterns(out io.Writer, id int) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		ps, err := cmd.client.GetPatterns(id, !histPatterns)
-		cmd.add(ps)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetPatterns(id, !histPatterns)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 func listPatterns(out io.Writer, id int, q string, qs ...string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		ps, err := cmd.client.QueryPatterns(id, !histPatterns, q, qs...)
-		cmd.add(ps)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.QueryPatterns(id, !histPatterns, q, qs...)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var listSuggestionsCommand = cobra.Command{
@@ -161,37 +145,34 @@ var listSuggestionsCommand = cobra.Command{
 
 func doListSuggestions(cmd *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	switch len(args) {
-	case 1:
+	u := unescape(args[1:]...)
+	switch len(u) {
+	case 0:
 		return listAllSuggestions(os.Stdout, bid)
-	case 2:
-		return listSuggestions(os.Stdout, bid, args[1])
+	case 1:
+		return listSuggestions(os.Stdout, bid, u[0])
 	default:
-		return listSuggestions(os.Stdout, bid, args[1], args[2:]...)
+		return listSuggestions(os.Stdout, bid, u[0], u[1:]...)
 	}
 }
 
 func listAllSuggestions(out io.Writer, id int) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		profile, err := cmd.client.GetProfile(id)
-		cmd.add(profile)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetProfile(id)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		suggestions, err := cmd.client.QueryProfile(id, q, qs...)
-		cmd.add(suggestions)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.QueryProfile(id, q, qs...)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var listSuspiciousCommand = cobra.Command{
@@ -201,18 +182,16 @@ var listSuspiciousCommand = cobra.Command{
 	RunE:  doListSuspicious,
 }
 
-func doListSuspicious(cmd *cobra.Command, args []string) error {
+func doListSuspicious(_ *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmdx := newCommand(os.Stdout)
-	cmdx.do(func() error {
-		counts, err := cmdx.client.GetSuspicious(bid)
-		cmdx.add(counts)
-		return err
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetSuspicious(bid)
 	})
-	return cmdx.print()
+	return cmd.done()
 }
 
 var listAdaptiveCommand = cobra.Command{
@@ -222,16 +201,114 @@ var listAdaptiveCommand = cobra.Command{
 	RunE:  doListAdaptive,
 }
 
-func doListAdaptive(cmd *cobra.Command, args []string) error {
+func doListAdaptive(_ *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmdx := newCommand(os.Stdout)
-	cmdx.do(func() error {
-		at, err := cmdx.client.GetAdaptiveTokens(bid)
-		cmdx.add(at)
-		return err
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetAdaptiveTokens(bid)
 	})
-	return cmdx.print()
+	return cmd.done()
+}
+
+var listELCommand = cobra.Command{
+	Use:   "el ID",
+	Short: "List extended lexicon tokens for the given book",
+	Args:  exactlyNIDs(1),
+	RunE:  doListEL,
+}
+
+func doListEL(_ *cobra.Command, args []string) error {
+	var bid int
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetExtendedLexicon(bid)
+	})
+	return cmd.done()
+}
+
+var listRRDMCommand = cobra.Command{
+	Use:   "rrdm ID",
+	Short: "List post correction for the given book",
+	Args:  exactlyNIDs(1),
+	RunE:  doListRRDM,
+}
+
+func doListRRDM(_ *cobra.Command, args []string) error {
+	var bid int
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetPostCorrection(bid)
+	})
+	return cmd.done()
+}
+
+var listOCRModelsCommand = cobra.Command{
+	Use:   "ocr ID",
+	Short: "List available ocr models",
+	Args:  exactlyNIDs(1),
+	RunE:  doListOCRModels,
+}
+
+func doListOCRModels(_ *cobra.Command, args []string) error {
+	var bid int
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetOCRModels(bid)
+	})
+	return cmd.done()
+}
+
+var listCharsCommand = cobra.Command{
+	Use:   "chars ID",
+	Short: "List frequency list of characters in book ID",
+	Args:  exactlyNIDs(1),
+	RunE:  doListChars,
+}
+
+func doListChars(_ *cobra.Command, args []string) error {
+	var bid int
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetCharMap(bid, charFilter())
+	})
+	return cmd.done()
+}
+
+func charFilter() string {
+	var str strings.Builder
+	wstr := []rune(listCharsFilter)
+	for i := 0; i < len(wstr); {
+		if i+1 < len(wstr) && i+2 < len(wstr) && wstr[i+1] == '-' {
+			if wstr[i] < wstr[i+2] {
+				for r := wstr[i]; r <= wstr[i+2]; r++ {
+					str.WriteRune(r)
+				}
+				i += 3
+				continue
+			}
+			for j := 0; j < 3; j++ {
+				str.WriteRune(wstr[i+j])
+			}
+			i += 3
+			continue
+		}
+		str.WriteRune(wstr[i])
+		i++
+	}
+	return str.String()
 }

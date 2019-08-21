@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"time"
 
+	"github.com/finkf/pcwgo/api"
 	"github.com/finkf/pcwgo/db"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -28,52 +28,68 @@ func init() {
 		"set the number of seconds to sleep between checks if the job has finished")
 }
 
-func waitForJobToFinish(cmd command, jobID int) {
-	cmd.do(func() error {
-		for !startNoWait {
-			time.Sleep(time.Duration(startSleepS) * time.Second)
+func reattach(cmd *command, jobID int) bool {
+	var res bool
+	if !startNoWait {
+		cmd.do(func(client *api.Client) (interface{}, error) {
 			status, err := cmd.client.GetJobStatus(jobID)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			log.Debugf("status: %s", status.StatusName)
+			if status.StatusID == db.StatusIDRunning {
+				res = true
+				return nil, nil
+			}
+			return nil, nil
+		})
+	}
+	return res
+}
+
+func waitForJobToFinish(cmd *command, jobID int) {
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		for !startNoWait {
+			status, err := client.GetJobStatus(jobID)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get job status: %v", err)
+			}
 			if status.StatusID == db.StatusIDFailed {
-				return fmt.Errorf("job %d failed", status.JobID)
+				return nil, fmt.Errorf("job %d failed", status.JobID)
 			}
 			if status.StatusID == db.StatusIDDone {
-				return nil
+				return nil, nil
 			}
+			log.Infof("job %d: %s", jobID, status.JobName)
+			time.Sleep(time.Duration(startSleepS) * time.Second)
 		}
-		return nil
+		return nil, nil
 	})
 }
 
 var startProfileCommand = cobra.Command{
-	Use:   "profile ID",
+	Use:   "profile ID [ALEX-TOKENS...]",
 	Short: "Start to profile book ID",
-	Args:  exactlyNIDs(1),
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  doProfile,
 }
 
-func doProfile(cmd *cobra.Command, args []string) error {
+func doProfile(_ *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book ID: %q", args[0])
 	}
-	return profile(os.Stdout, bid)
-}
-
-func profile(out io.Writer, id int) error {
-	cmd := newCommand(out)
+	cmd := newCommand(os.Stdout)
 	// start profiling
-	var jobID int
-	cmd.do(func() error {
-		job, err := cmd.client.PostProfile(id)
-		jobID = job.ID
-		return err
-	})
-	waitForJobToFinish(cmd, jobID)
-	return cmd.print()
+	jobID := bid
+	if !reattach(&cmd, jobID) {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			job, err := client.PostProfile(bid, args[1:]...)
+			jobID = job.ID
+			return nil, err
+		})
+	}
+	waitForJobToFinish(&cmd, jobID)
+	return cmd.done()
 }
 
 var startELCommand = cobra.Command{
@@ -85,17 +101,100 @@ var startELCommand = cobra.Command{
 
 func doEL(_ *cobra.Command, args []string) error {
 	var bid int
-	if err := scanf(args[0], "%d", &bid); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book ID: %q", args[0])
 	}
 	cmd := newCommand(os.Stdout)
 	// start profiling
-	var jobID int
-	cmd.do(func() error {
-		job, err := cmd.client.PostExtendedLexicon(bid)
-		jobID = job.ID
-		return err
-	})
-	waitForJobToFinish(cmd, jobID)
-	return cmd.print()
+	jobID := bid
+	if !reattach(&cmd, jobID) {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			job, err := client.PostExtendedLexicon(bid)
+			jobID = job.ID
+			return nil, err
+		})
+	}
+	waitForJobToFinish(&cmd, jobID)
+	if !startNoWait {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			return client.GetExtendedLexicon(bid)
+		})
+	}
+	return cmd.done()
+}
+
+var startRRDMCommand = cobra.Command{
+	Use:   "rrdm ID",
+	Short: "Start automatic post-correction on book ID",
+	Args:  exactlyNIDs(1),
+	RunE:  doRRDM,
+}
+
+func doRRDM(_ *cobra.Command, args []string) error {
+	var bid int
+	if n := parseIDs(args[0], &bid); n != 1 {
+		return fmt.Errorf("invalid book ID: %q", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	// start profiling
+	jobID := bid
+	if !reattach(&cmd, jobID) {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			job, err := client.PostPostCorrection(bid)
+			jobID = job.ID
+			return nil, err
+		})
+	}
+	waitForJobToFinish(&cmd, jobID)
+	return cmd.done()
+}
+
+var startPredictCommand = cobra.Command{
+	Use:   "predict ID NAME",
+	Short: "Run OCR model NAME on book ID",
+	Args:  cobra.ExactArgs(2),
+	RunE:  doPredict,
+}
+
+func doPredict(_ *cobra.Command, args []string) error {
+	var bid, pid, lid int
+	if parseIDs(args[0], &bid, &pid, &lid) == 0 {
+		return fmt.Errorf("invalid book id: %s", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	jobID := bid
+	if !reattach(&cmd, jobID) {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			job, err := client.OCRPredict(bid, pid, lid, args[1])
+			jobID = job.ID
+			return nil, err
+		})
+	}
+	waitForJobToFinish(&cmd, jobID)
+	return cmd.done()
+}
+
+var startTrainCommand = cobra.Command{
+	Use:   "train ID NAME",
+	Short: "Train an OCR model on book ID using NAME as base model (not implemented yet)",
+	Args:  cobra.ExactArgs(2),
+	RunE:  doTrain,
+}
+
+func doTrain(_ *cobra.Command, args []string) error {
+	var bid int
+	if parseIDs(args[0], &bid) != 1 {
+		return fmt.Errorf("invalid book id: %s", args[0])
+	}
+	cmd := newCommand(os.Stdout)
+	jobID := bid
+	if !reattach(&cmd, jobID) {
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			job, err := cmd.client.OCRTrain(bid, args[1])
+			jobID = job.ID
+			return nil, err
+		})
+	}
+	waitForJobToFinish(&cmd, jobID)
+	return cmd.done()
 }

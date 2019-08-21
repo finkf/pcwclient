@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/finkf/pcwgo/api"
@@ -42,34 +43,38 @@ func doCorrect(cmd *cobra.Command, args []string) error {
 }
 
 func correct(out io.Writer, id, correction string) error {
-	if bid, pid, lid, wid, ok := wordID(id); ok {
-		return correctWord(os.Stdout, bid, pid, lid, wid, correction)
+	u, err := strconv.Unquote(`"` + correction + `"`)
+	if err != nil {
+		return err
 	}
-	if bid, pid, lid, ok := lineID(id); ok {
-		return correctLine(os.Stdout, bid, pid, lid, correction)
+	var bid, pid, lid, wid, len int
+	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
+	case 3:
+		return correctLine(os.Stdout, bid, pid, lid, u)
+	case 4:
+		return correctWord(os.Stdout, bid, pid, lid, wid, -1, u)
+	case 5:
+		return correctWord(os.Stdout, bid, pid, lid, wid, len, u)
+	default:
+		return fmt.Errorf("invalid id: %q", id)
 	}
-	return fmt.Errorf("invalid id: %q", id)
 }
 
-func correctLine(out io.Writer, bid, pid, lid int, correction string) error {
+func correctLine(out io.Writer, bid, pid, lid int, cor string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		line, err := cmd.client.PostLine(bid, pid, lid, api.Correction{
-			Correction: correction,
-		})
-		cmd.add(line)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.PostLine(bid, pid, lid, cor)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
-func correctWord(out io.Writer, bid, pid, lid, wid int, correction string) error {
+func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		cor := api.Correction{Correction: correction}
-		word, err := cmd.client.PostToken(bid, pid, lid, wid, cor)
-		cmd.add(word)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		if len == -1 {
+			return client.PostToken(bid, pid, lid, wid, cor)
+		}
+		return client.PostTokenLen(bid, pid, lid, wid, len, cor)
 	})
-	return cmd.print()
+	return cmd.done()
 }

@@ -14,28 +14,34 @@ import (
 func init() {
 	searchCommand.Flags().BoolVarP(&searchPattern, "pattern", "e",
 		false, "search for error patterns")
-	searchCommand.Flags().BoolVarP(&searchPartial, "partial", "p",
-		false, "only search max matches")
+	searchCommand.Flags().BoolVarP(&searchAll, "all", "a",
+		false, "search for all matches")
 	searchCommand.Flags().IntVarP(&searchMax, "max", "m",
-		100, "set max matches")
+		50, "set max matches")
 	searchCommand.Flags().IntVarP(&searchSkip, "skip", "s",
 		0, "set skip matches")
 	splitCommand.Flags().BoolVarP(&splitRandom, "random", "r",
 		false, "split random")
-	splitCommand.Flags().IntVarP(&splitN, "number", "n",
-		10, "number of splits")
 }
 
 var loginCommand = cobra.Command{
-	Use:   "login EMAIL PASSWORD",
-	Short: "login to pocoweb",
+	Use:   "login [EMAIL PASSWORD]",
+	Short: "login to pocoweb or get logged in user",
 	RunE:  runLogin,
-	Args:  cobra.ExactArgs(2),
+	Args: func(_ *cobra.Command, args []string) error {
+		if len(args) != 0 && len(args) != 2 {
+			return fmt.Errorf("accepts 0 or 2 arg(s)")
+		}
+		return nil
+	},
 }
 
 func runLogin(cmd *cobra.Command, args []string) error {
-	user, password := args[0], args[1]
-	return login(os.Stdout, user, password)
+	if len(args) == 2 {
+		user, password := args[0], args[1]
+		return login(os.Stdout, user, password)
+	}
+	return getLogin(os.Stdout)
 }
 
 func login(out io.Writer, user, password string) error {
@@ -44,19 +50,26 @@ func login(out io.Writer, user, password string) error {
 	}
 	url := getURL()
 	if url == "" {
-		url = loadConfig().URL
-		if url == "" {
-			return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
-		}
+		return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
 	}
 	client, err := api.Login(url, user, password)
+	if err != nil {
+		return fmt.Errorf("cannot login: %v", err)
+	}
 	cmd := command{client: client, err: err, out: out}
-	cmd.do(func() error {
-		saveConfig(&config{URL: url, Auth: client.Session.Auth})
-		cmd.add(client.Session)
-		return nil
+	session := client.Session
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return session, nil
 	})
-	return cmd.print()
+	return cmd.done()
+}
+
+func getLogin(out io.Writer) error {
+	cmd := newCommand(out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.GetLogin()
+	})
+	return cmd.done()
 }
 
 var logoutCommand = cobra.Command{
@@ -66,12 +79,12 @@ var logoutCommand = cobra.Command{
 	Args:  cobra.NoArgs, //ExactArgs(0),
 }
 
-func runLogout(cmd *cobra.Command, args []string) error {
-	cmdx := newCommand(os.Stdout)
-	cmdx.do(func() error {
-		return cmdx.client.Logout()
+func runLogout(_ *cobra.Command, args []string) error {
+	cmd := newCommand(os.Stdout)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return nil, client.Logout()
 	})
-	return cmdx.err
+	return cmd.done()
 }
 
 var versionCommand = cobra.Command{
@@ -87,18 +100,13 @@ func runVersion(cmd *cobra.Command, args []string) error {
 func version(out io.Writer) error {
 	url := getURL()
 	if url == "" {
-		url = loadConfig().URL
-		if url == "" {
-			return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
-		}
+		return fmt.Errorf("missing url: use --url, or set POCOWEBC_URL")
 	}
 	cmd := command{out: out, client: api.NewClient(url)}
-	cmd.do(func() error {
-		version, err := cmd.client.GetAPIVersion()
-		cmd.add(version)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.GetAPIVersion()
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var rawCommand = cobra.Command{
@@ -118,14 +126,14 @@ func runRaw(cmd *cobra.Command, args []string) error {
 
 func raw(out io.Writer, format string, args ...interface{}) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		return cmd.client.Raw(fmt.Sprintf(format, args...), out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return nil, cmd.client.Raw(fmt.Sprintf(format, args...), out)
 	})
-	return cmd.err
+	return cmd.done()
 }
 
 var searchCommand = cobra.Command{
-	Use:   "search ID QUERY",
+	Use:   "search ID QUERY [QUERIES...]",
 	Short: "search for tokens and error patterns",
 	RunE:  runSearch,
 	Args:  cobra.MinimumNArgs(2),
@@ -135,13 +143,13 @@ var (
 	searchSkip    int
 	searchMax     int
 	searchPattern bool
-	searchPartial bool
+	searchAll     bool
 )
 
 func runSearch(cmd *cobra.Command, args []string) error {
 	var id int
-	if err := scanf(args[0], "%d", &id); err != nil {
-		return fmt.Errorf("invalid book id: %v", err)
+	if n := parseIDs(args[0], &id); n != 1 {
+		return fmt.Errorf("invalid book id: %q", args[0])
 	}
 	switch len(args) {
 	case 2:
@@ -155,8 +163,11 @@ func search(out io.Writer, id int, ep bool, q string, qs ...string) error {
 	cmd := newCommand(out)
 	cmd.client.Skip = searchSkip
 	cmd.client.Max = searchMax
-	cmd.do(func() error {
-		for {
+	var done bool
+	for !done {
+		done = true
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			done = false
 			var res *api.SearchResults
 			var err error
 			if ep {
@@ -164,17 +175,15 @@ func search(out io.Writer, id int, ep bool, q string, qs ...string) error {
 			} else {
 				res, err = cmd.client.Search(id, q, qs...)
 			}
-			if err != nil {
-				return err
-			}
-			cmd.add(res)
-			if searchPartial || len(res.Matches) == 0 {
-				return nil
+			if !searchAll || len(res.Matches) == 0 {
+				done = true
+				return nil, nil
 			}
 			cmd.client.Skip += cmd.client.Max
-		}
-	})
-	return cmd.print()
+			return res, err
+		})
+	}
+	return cmd.done()
 }
 
 var downloadCommand = cobra.Command{
@@ -198,120 +207,191 @@ func doDownload(cmd *cobra.Command, args []string) error {
 
 func download(out io.Writer, id string) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		bid, ok := bookID(id)
-		if !ok {
-			return fmt.Errorf("invalid book id: %s", id)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		var bid int
+		if n := parseIDs(id, &bid); n != 1 {
+			return nil, fmt.Errorf("invalid book id: %s", id)
 		}
 		r, err := cmd.client.Download(bid)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		defer r.Close()
 		n, err := io.Copy(cmd.out, r)
 		log.Debugf("wrote %d bytes", n)
-		return err
+		return nil, err
 	})
 	return cmd.err
 }
 
 var (
 	splitRandom bool
-	splitN      int
 )
 
 var splitCommand = cobra.Command{
-	Use:   "split ID",
-	Short: "split a book into multiple projects",
+	Use:   "split ID USERID [USERID...]",
+	Short: "split the project ID into multiple packages",
 	RunE:  doSplit,
-	Args:  cobra.ExactArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 }
 
 func doSplit(cmd *cobra.Command, args []string) error {
-	return split(os.Stdout, args[0])
+	var ids []int
+	for _, arg := range args {
+		id, err := strconv.Atoi(arg)
+		if err != nil {
+			return fmt.Errorf("split: invalid id: %s", arg)
+		}
+		ids = append(ids, id)
+	}
+	if err := split(os.Stdout, ids[0], ids[1:]); err != nil {
+		return fmt.Errorf("split: %v", err)
+	}
+	return nil
 }
 
-func split(out io.Writer, id string) error {
-	bid, ok := bookID(id)
-	if !ok {
-		return fmt.Errorf("invalid book ID: %s", id)
-	}
+func split(out io.Writer, bid int, userids []int) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		books, err := cmd.client.Split(bid, splitN, splitRandom)
-		cmd.add(books)
-		return err
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return cmd.client.Split(bid, splitRandom, userids[0], userids[1:]...)
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 var assignCommand = cobra.Command{
-	Use:   "assign BOOK-ID USER-ID",
-	Short: "assign a book to another user",
-	Args:  exactlyNIDs(2),
+	Use:   "assign ID [USERID]",
+	Short: "assign the package ID to the user USERID",
 	RunE:  doAssign,
+	Args: func(_ *cobra.Command, args []string) error {
+		switch len(args) {
+		case 1, 2:
+			return nil
+		default:
+			return fmt.Errorf("requires one or two args")
+		}
+	},
 }
 
 func doAssign(cmd *cobra.Command, args []string) error {
-	bid, _ := strconv.Atoi(args[0])
-	uid, _ := strconv.Atoi(args[1])
-	return assign(os.Stdout, bid, uid)
+	var ids []int
+	for _, arg := range args {
+		id, err := strconv.Atoi(arg)
+		if err != nil {
+			return fmt.Errorf("assign: invalid id: %s", arg)
+		}
+		ids = append(ids, id)
+	}
+	var err error
+	switch len(ids) {
+	case 2:
+		err = assignTo(os.Stdout, ids[0], ids[1])
+	default:
+		err = assignBack(os.Stdout, ids[0])
+	}
+	if err != nil {
+		return fmt.Errorf("assign: %v", err)
+	}
+	return nil
 }
 
-func assign(out io.Writer, bid, uid int) error {
+func assignTo(out io.Writer, bid, uid int) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		return cmd.client.Assign(bid, uid)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return nil, cmd.client.AssignTo(bid, uid)
 	})
-	return cmd.err
+	return cmd.done()
 }
 
-var finishCommand = cobra.Command{
-	Use:   "finish ID",
-	Short: "finish a book and reassign it to its original user",
-	Args:  exactlyNIDs(1),
-	RunE:  doFinish,
-}
-
-func doFinish(cmd *cobra.Command, args []string) error {
-	bid, _ := strconv.Atoi(args[0])
-	return finish(os.Stdout, bid)
-}
-
-func finish(out io.Writer, bid int) error {
+func assignBack(out io.Writer, bid int) error {
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		return cmd.client.Finish(bid)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return nil, cmd.client.AssignBack(bid)
 	})
-	return cmd.err
+	return cmd.done()
+}
+
+var takeBackCommand = cobra.Command{
+	Use:   "takeback ID",
+	Short: "take back packages of project ID",
+	RunE:  doTakeBack,
+	Args:  cobra.ExactArgs(1),
+}
+
+func doTakeBack(cmd *cobra.Command, args []string) error {
+	var pid int
+	if n := parseIDs(args[0], &pid); n != 1 {
+		return fmt.Errorf("takeback: invalid id: %s", args[0])
+	}
+	if err := takeBack(os.Stdout, pid); err != nil {
+		return fmt.Errorf("takeback: %v", err)
+	}
+	return nil
+}
+
+func takeBack(out io.Writer, pid int) error {
+	cmd := newCommand(out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return nil, cmd.client.TakeBack(pid)
+	})
+	return cmd.done()
 }
 
 var deleteCommand = cobra.Command{
-	Use:   "delete IDS...",
-	Short: "delete a book, page or line",
-	Args:  cobra.MinimumNArgs(1),
-	RunE:  doDelete,
+	Use:   "delete",
+	Short: "delete users or books",
 }
 
-func doDelete(_ *cobra.Command, args []string) error {
+var deleteBooksCommand = cobra.Command{
+	Use:   "books IDS...",
+	Short: "delete a books, pages or lines",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  deleteBooks,
+}
+
+func deleteBooks(_ *cobra.Command, args []string) error {
 	cmd := newCommand(os.Stdout)
 	for _, id := range args {
-		if bid, pid, lid, ok := lineID(id); ok {
-			cmd.do(func() error {
-				return cmd.client.DeleteLine(bid, pid, lid)
+		var bid, pid, lid int
+		switch n := parseIDs(id, &bid, &pid, &lid); n {
+		case 3:
+			cmd.do(func(client *api.Client) (interface{}, error) {
+				return nil, client.DeleteLine(bid, pid, lid)
 			})
 			continue
-		}
-		if bid, pid, ok := pageID(id); ok {
-			cmd.do(func() error {
-				return cmd.client.DeletePage(bid, pid)
+		case 2:
+			cmd.do(func(client *api.Client) (interface{}, error) {
+				return nil, client.DeletePage(bid, pid)
 			})
 			continue
+		case 1:
+			cmd.do(func(client *api.Client) (interface{}, error) {
+				return nil, client.DeleteBook(bid)
+			})
+			continue
+		default:
+			return fmt.Errorf("cannot delete: invalid id: %q", id)
 		}
-		if _, ok := bookID(id); ok {
-			return fmt.Errorf("cannot delete book: not implemented")
+	}
+	return nil
+}
+
+var deleteUsersCommand = cobra.Command{
+	Use:   "users IDS...",
+	Short: "delete users",
+	Args:  cobra.MinimumNArgs(1),
+	RunE:  deleteUsers,
+}
+
+func deleteUsers(_ *cobra.Command, args []string) error {
+	cmd := newCommand(os.Stdout)
+	for _, id := range args {
+		var uid int
+		if n := parseIDs(id, &uid); n != 1 {
+			return fmt.Errorf("cannot delete user: invalid user id: %s", id)
 		}
-		return fmt.Errorf("cannot delete: invalid id: %s", id)
+		cmd.do(func(client *api.Client) (interface{}, error) {
+			return nil, client.DeleteUser(int64(uid))
+		})
 	}
 	return nil
 }

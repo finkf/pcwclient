@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -25,22 +26,22 @@ func show(_ *cobra.Command, args []string) error {
 		if n := parseIDs(id, &bid, &pid, &lid); n < 2 {
 			return fmt.Errorf("invalid id: %s", id)
 		}
-		cmd.do(func() error {
+		cmd.do(func(client *api.Client) (interface{}, error) {
 			if lid == 0 {
-				p, err := cmd.client.GetPage(bid, pid)
+				p, err := client.GetPage(bid, pid)
 				if err != nil {
-					return err
+					return nil, err
 				}
-				return showImage(os.Stdout, p.ImgFile)
+				return nil, showImage(os.Stdout, p.ImgFile)
 			}
-			l, err := cmd.client.GetLine(bid, pid, lid)
+			l, err := client.GetLine(bid, pid, lid)
 			if err != nil {
-				return err
+				return nil, err
 			}
-			return showImage(os.Stdout, l.ImgFile)
+			return nil, showImage(os.Stdout, l.ImgFile)
 		})
 	}
-	return cmd.err
+	return cmd.done()
 }
 
 func showImage(out io.Writer, imgpath string) error {

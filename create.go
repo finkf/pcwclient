@@ -16,26 +16,37 @@ import (
 )
 
 func init() {
-	createBookCommand.Flags().StringVarP(&bookAuthor, "author", "a", "", "set book's author (required)")
-	createBookCommand.Flags().StringVarP(&bookTitle, "title", "t", "", "set book's title (required)")
-	createBookCommand.Flags().StringVarP(&bookDescription, "description", "d", "", "set book's description")
-	createBookCommand.Flags().StringVarP(&bookLanguage, "language", "l", "", "set book's language")
-	createBookCommand.Flags().StringVarP(&bookProfilerURL, "profilerurl", "p", "local", "set book's profiler url")
-	createBookCommand.Flags().IntVarP(&bookYear, "year", "y", 1900, "set book's year")
+	createBookCommand.Flags().StringVarP(&bookAuthor, "author", "a", "",
+		"set book's author (required)")
+	createBookCommand.Flags().StringVarP(&bookTitle, "title", "t", "",
+		"set book's title (required)")
+	createBookCommand.Flags().StringVarP(&bookDescription, "description", "d", "",
+		"set book's description")
+	createBookCommand.Flags().StringVarP(&bookLanguage, "language", "l", "",
+		"set book's language")
+	createBookCommand.Flags().StringVarP(&bookProfilerURL, "profilerurl", "p", "local",
+		"set book's profiler url")
+	createBookCommand.Flags().IntVarP(&bookYear, "year", "y", 1900,
+		"set book's year")
 	cobra.MarkFlagRequired(createBookCommand.Flags(), "author")
 	cobra.MarkFlagRequired(createBookCommand.Flags(), "title")
-	createUserCommand.Flags().StringVarP(&userName, "name", "n", "", "set the user's name (required)")
-	createUserCommand.Flags().StringVarP(&userEmail, "email", "e", "", "set the user's name (required)")
-	createUserCommand.Flags().StringVarP(&userPassword, "password", "p", "", "set the user's password (required)")
-	createUserCommand.Flags().StringVarP(&userInstitute, "institute", "i", "", "set the user's institute")
-	createUserCommand.Flags().BoolVarP(&userAdmin, "admin", "a", false, "user has administrator permissions")
+	createUserCommand.Flags().StringVarP(&userName, "name", "n", "",
+		"set the user's name (required)")
+	createUserCommand.Flags().StringVarP(&userEmail, "email", "e", "",
+		"set the user's name (required)")
+	createUserCommand.Flags().StringVarP(&userPassword, "password", "p", "",
+		"set the user's password (required)")
+	createUserCommand.Flags().StringVarP(&userInstitute, "institute", "i", "",
+		"set the user's institute")
+	createUserCommand.Flags().BoolVarP(&userAdmin, "admin", "a", false,
+		"user has administrator permissions")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "name")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "email")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "password")
 }
 
 var createCommand = cobra.Command{
-	Use:   "create",
+	Use:   "new",
 	Short: "Create books and users",
 }
 
@@ -68,38 +79,25 @@ func createBook(p string, out io.Writer) error {
 	if bookAuthor == "" || bookTitle == "" || bookLanguage == "" {
 		return fmt.Errorf("missing title, author and/or language")
 	}
-	var zip io.ReadCloser
-	var err error
-	cmd := newCommand(out)
+	zip, err := openAsZIP(p)
+	if err != nil {
+		return fmt.Errorf("cannot open %s: %v", p, err)
+	}
 	defer func() {
-		if zip != nil {
-			zip.Close()
-		}
+		zip.Close()
 	}()
-	cmd.do(func() error {
-		zip, err = openAsZIP(p)
-		return err
-	})
-	cmd.do(func() error {
-		book, err := cmd.client.PostZIP(zip)
-		cmd.add(book)
-		return err
-	})
-	cmd.do(func() error {
-		newBook := api.Book{
-			ProjectID:   cmd.data[0].(*api.Book).ProjectID,
+	cmd := newCommand(out)
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.PostBook(zip, api.Book{
 			Title:       bookTitle,
 			Author:      bookAuthor,
 			Description: bookDescription,
 			Year:        bookYear,
 			Language:    bookLanguage,
 			ProfilerURL: bookProfilerURL,
-		}
-		book, err := cmd.client.PostBook(newBook)
-		cmd.data[0] = book
-		return err
+		})
 	})
-	return cmd.print()
+	return cmd.done()
 }
 
 func openAsZIP(p string) (io.ReadCloser, error) {
@@ -169,8 +167,8 @@ func createUser(out io.Writer) error {
 		return fmt.Errorf("missing user email and/or password")
 	}
 	cmd := newCommand(out)
-	cmd.do(func() error {
-		req := api.CreateUserRequest{
+	cmd.do(func(client *api.Client) (interface{}, error) {
+		return client.PostUser(api.CreateUserRequest{
 			User: api.User{
 				Name:      userName,
 				Email:     userEmail,
@@ -178,10 +176,7 @@ func createUser(out io.Writer) error {
 				Admin:     userAdmin,
 			},
 			Password: userPassword,
-		}
-		u, err := cmd.client.PostUser(req)
-		cmd.add(u)
-		return err
+		})
 	})
-	return cmd.print()
+	return cmd.done()
 }
