@@ -1,3 +1,3 @@
 # pcwclient
 
-Command line clinet for [pocoweb](http://github.com/cisocrgroup/pocoweb)
+Command line client for [pocoweb](http://github.com/cisocrgroup/pocoweb)
