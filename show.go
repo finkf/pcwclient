@@ -20,13 +20,13 @@ var showCommand = cobra.Command{
 }
 
 func show(_ *cobra.Command, args []string) error {
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	for _, id := range args {
 		var bid, pid, lid int
 		if n := parseIDs(id, &bid, &pid, &lid); n < 2 {
 			return fmt.Errorf("invalid id: %s", id)
 		}
-		cmd.do(func(client *api.Client) (interface{}, error) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			if lid == 0 {
 				p, err := client.GetPage(bid, pid)
 				if err != nil {
@@ -41,7 +41,7 @@ func show(_ *cobra.Command, args []string) error {
 			return nil, showImage(os.Stdout, l.ImgFile)
 		})
 	}
-	return cmd.done()
+	return c.done()
 }
 
 func showImage(out io.Writer, imgpath string) error {

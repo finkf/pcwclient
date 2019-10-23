@@ -42,25 +42,25 @@ func doListUsers(cmd *cobra.Command, args []string) error {
 }
 
 func listUsers(out io.Writer, ids ...string) error {
-	cmd := newCommand(out)
+	c := newClient(out)
 	for _, id := range ids {
 		var uid int
 		if n := parseIDs(id, &uid); n != 1 {
 			return fmt.Errorf("invalid user id: %q", id)
 		}
-		cmd.do(func(client *api.Client) (interface{}, error) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			return client.GetUser(int64(uid))
 		})
 	}
-	return cmd.done()
+	return c.done()
 }
 
 func listAllUsers(out io.Writer) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
 		return client.GetUsers()
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listBooksCommand = cobra.Command{
@@ -77,25 +77,25 @@ func doListBooks(cmd *cobra.Command, args []string) error {
 }
 
 func listBooks(out io.Writer, ids ...string) error {
-	cmd := newCommand(out)
+	c := newClient(out)
 	for _, id := range ids {
 		var bid int
 		if n := parseIDs(id, &bid); n != 1 {
 			return fmt.Errorf("invalid book id: %q", id)
 		}
-		cmd.do(func(client *api.Client) (interface{}, error) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			return client.GetBook(bid)
 		})
 	}
-	return cmd.done()
+	return c.done()
 }
 
 func listAllBooks(out io.Writer) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
 		return client.GetBooks()
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listPatternsCommand = cobra.Command{
@@ -121,19 +121,19 @@ func doListPatterns(cmd *cobra.Command, args []string) error {
 }
 
 func listAllPatterns(out io.Writer, id int) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetPatterns(id, !histPatterns)
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetPatterns(id, !histPatterns)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 func listPatterns(out io.Writer, id int, q string, qs ...string) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.QueryPatterns(id, !histPatterns, q, qs...)
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.QueryPatterns(id, !histPatterns, q, qs...)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listSuggestionsCommand = cobra.Command{
@@ -160,19 +160,19 @@ func doListSuggestions(cmd *cobra.Command, args []string) error {
 }
 
 func listAllSuggestions(out io.Writer, id int) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetProfile(id)
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetProfile(id)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.QueryProfile(id, q, qs...)
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.QueryProfile(id, q, qs...)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listSuspiciousCommand = cobra.Command{
@@ -187,11 +187,11 @@ func doListSuspicious(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetSuspicious(bid)
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetSuspicious(bid)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listAdaptiveCommand = cobra.Command{
@@ -206,11 +206,11 @@ func doListAdaptive(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetAdaptiveTokens(bid)
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetAdaptiveTokens(bid)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listELCommand = cobra.Command{
@@ -225,11 +225,11 @@ func doListEL(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetExtendedLexicon(bid)
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetExtendedLexicon(bid)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listRRDMCommand = cobra.Command{
@@ -244,11 +244,11 @@ func doListRRDM(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetPostCorrection(bid)
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetPostCorrection(bid)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listOCRModelsCommand = cobra.Command{
@@ -263,11 +263,11 @@ func doListOCRModels(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetOCRModels(bid)
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetOCRModels(bid)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 var listCharsCommand = cobra.Command{
@@ -282,11 +282,11 @@ func doListChars(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book id: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetCharMap(bid, charFilter())
+	c := newClient(os.Stdout)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetCharMap(bid, charFilter())
 	})
-	return cmd.done()
+	return c.done()
 }
 
 func charFilter() string {

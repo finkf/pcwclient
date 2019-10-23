@@ -15,7 +15,7 @@ import (
 var correctCommand = cobra.Command{
 	Use:   "correct [ID CORRECTION...]",
 	Short: "Correct lines or words",
-	Args: func(cmd *cobra.Command, args []string) error {
+	Args: func(c *cobra.Command, args []string) error {
 		// zero or 2+ args
 		if len(args) == 1 {
 			return fmt.Errorf("expected exactly 0 or at least 2 args")
@@ -25,7 +25,7 @@ var correctCommand = cobra.Command{
 	RunE: doCorrect,
 }
 
-func doCorrect(cmd *cobra.Command, args []string) error {
+func doCorrect(c *cobra.Command, args []string) error {
 	if len(args) >= 2 {
 		return correct(os.Stdout, args[0], strings.Join(args[1:], " "))
 	}
@@ -61,20 +61,20 @@ func correct(out io.Writer, id, correction string) error {
 }
 
 func correctLine(out io.Writer, bid, pid, lid int, cor string) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return client.PostLine(bid, pid, lid, cor)
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return client.PutLine(bid, pid, lid, cor)
 	})
-	return cmd.done()
+	return c.done()
 }
 
 func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor string) error {
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
 		if len == -1 {
-			return client.PostToken(bid, pid, lid, wid, cor)
+			return client.PutToken(bid, pid, lid, wid, cor)
 		}
-		return client.PostTokenLen(bid, pid, lid, wid, len, cor)
+		return client.PutTokenLen(bid, pid, lid, wid, len, cor)
 	})
-	return cmd.done()
+	return c.done()
 }

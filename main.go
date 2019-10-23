@@ -1,4 +1,4 @@
-package main // import "github.com/finkf/pocowebc"
+package main // import "github.com/finkf/pcwclient"
 
 import log "github.com/sirupsen/logrus"
 

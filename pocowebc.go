@@ -21,6 +21,7 @@ import (
 var (
 	debug        = false
 	jsonOutput   = false
+	skipVerify   = false
 	formatString = ""
 	authToken    = ""
 	pocowebURL   = ""
@@ -50,9 +51,9 @@ func init() {
 	mainCommand.AddCommand(&searchCommand)
 	mainCommand.AddCommand(&correctCommand)
 	mainCommand.AddCommand(&downloadCommand)
-	mainCommand.AddCommand(&splitCommand)
-	mainCommand.AddCommand(&assignCommand)
-	mainCommand.AddCommand(&takeBackCommand)
+	mainCommand.AddCommand(&pkgCommand)
+	pkgCommand.AddCommand(&assignCommand)
+	pkgCommand.AddCommand(&takeBackCommand)
 	mainCommand.AddCommand(&deleteCommand)
 	mainCommand.AddCommand(&startCommand)
 	mainCommand.AddCommand(&showCommand)
@@ -68,6 +69,7 @@ func init() {
 	listCommand.AddCommand(&listCharsCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
+	createCommand.AddCommand(&createPackagesCommand)
 	startCommand.AddCommand(&startProfileCommand)
 	startCommand.AddCommand(&startELCommand)
 	startCommand.AddCommand(&startRRDMCommand)
@@ -79,14 +81,16 @@ func init() {
 	mainCommand.SilenceErrors = true
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
 		"output raw json")
+	mainCommand.PersistentFlags().BoolVarP(&skipVerify, "skip-verify", "S", false,
+		"ignore invalid ssl certificates")
 	mainCommand.PersistentFlags().BoolVarP(&debug, "debug", "D", false,
 		"enable debug output")
 	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U",
-		getURL(), "set pocoweb url (env: POCOWEBC_URL)")
+		getURL(), "set pocoweb url (env: PCWCLIENT_URL)")
 	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F",
 		"", "set output format")
 	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A",
-		getAuth(), "set auth token (env: POCOWEBC_AUTH)")
+		getAuth(), "set auth token (env: PCWCLIENT_AUTH)")
 }
 
 func exactlyNIDs(n int) func(cmd *cobra.Command, args []string) error {
@@ -117,248 +121,262 @@ func parseIDs(id string, ids ...*int) int {
 	return i
 }
 
-type command struct {
+type client struct {
 	client *api.Client
 	data   []interface{}
 	out    io.Writer
 	err    error
 }
 
-func newCommand(out io.Writer) command {
+func newClient(out io.Writer) *client {
 	url, auth := getURL(), getAuth()
 	if url == "" || auth == "" {
-		return command{
+		return &client{
 			err: fmt.Errorf("missing login information: see login sub command"),
 		}
 	}
 	log.Debugf("authenticating at %s with %s", url, auth)
-	return command{client: api.Authenticate(url, auth), out: out}
+	return &client{client: api.Authenticate(url, auth, skipVerify), out: out}
 }
 
-func (cmd *command) do(f func(*api.Client) (interface{}, error)) {
-	if cmd.err != nil {
+func (c *client) do(f func(*api.Client) (interface{}, error)) {
+	if c.err != nil {
 		return
 	}
-	val, err := f(cmd.client)
-	// cmd.print handles the possible error
-	cmd.err = err
-	cmd.print(val)
+	val, err := f(c.client)
+	// c.print handles the possible error
+	c.err = err
+	c.print(val)
 }
 
-func (cmd *command) done() error {
-	if cmd.err != nil {
-		return cmd.err
+func (c *client) done() error {
+	if c.err != nil {
+		return c.err
 	}
 	if jsonOutput {
-		return cmd.printJSON()
+		return c.printJSON()
 	}
 	if formatString != "" {
-		return cmd.printTemplate(formatString)
+		return c.printTemplate(formatString)
 	}
 	return nil
 }
 
-func (cmd *command) print(val interface{}) {
-	if cmd.err != nil {
+func (c *client) print(val interface{}) {
+	if c.err != nil {
 		return
 	}
 	// cache printout data for json or format output
 	if jsonOutput || formatString != "" {
-		cmd.data = append(cmd.data, val)
+		c.data = append(c.data, val)
 		return
 	}
 	if val != nil {
-		cmd.printVal(val)
+		c.printVal(val)
 	}
 }
 
-func (cmd *command) printVal(val interface{}) {
-	if cmd.err != nil {
+func (c *client) printVal(val interface{}) {
+	if c.err != nil {
 		return
 	}
 	// just print the given value
 	switch t := val.(type) {
 	case *api.Page:
-		cmd.printPage(t)
+		c.printPage(t)
 	case *api.Line:
-		cmd.printLine(t)
+		c.printLine(t)
 	case *api.Token:
-		cmd.printWord(t)
+		c.printWord(t)
 	case []api.Token:
-		cmd.printWords(t)
+		c.printWords(t)
 	case []interface{}:
-		cmd.printArray(t)
+		c.printArray(t)
 	case api.Session:
-		cmd.printSession(t)
+		c.printSession(t)
 	case api.Version:
-		cmd.printVersion(t)
+		c.printVersion(t)
 	case *api.Book:
-		cmd.printBook(t)
+		c.printBook(t)
 	case *api.Books:
-		cmd.printBooks(t)
+		c.printBooks(t)
 	case api.SplitPackages:
-		cmd.printSplitPackages(t)
+		c.printSplitPackages(t)
 	case api.User:
-		cmd.printUser(t)
+		c.printUser(t)
 	case api.Users:
-		cmd.printUsers(t)
+		c.printUsers(t)
 	case *api.SearchResults:
-		cmd.printSearchResults(t)
+		c.printSearchResults(t)
 	case gofiler.Profile:
-		cmd.printProfile(t)
+		c.printProfile(t)
 	case api.Suggestions:
-		cmd.printSuggestions(t)
+		c.printSuggestions(t)
 	case api.SuggestionCounts:
-		cmd.printSuggestionCounts(t)
+		c.printSuggestionCounts(t)
 	case api.Patterns:
-		cmd.printPatterns(t)
+		c.printPatterns(t)
 	case api.PatternCounts:
-		cmd.printPatternCounts(t)
+		c.printPatternCounts(t)
 	case api.AdaptiveTokens:
-		cmd.printAdaptiveTokens(t)
+		c.printAdaptiveTokens(t)
 	case api.Models:
-		cmd.printModels(t)
+		c.printModels(t)
 	case api.ExtendedLexicon:
-		cmd.printExtendedLexicon(t)
+		c.printExtendedLexicon(t)
 	case *api.PostCorrection:
-		cmd.printPostCorrection(t)
+		c.printPostCorrection(t)
 	case api.CharMap:
-		cmd.printCharMap(t)
+		c.printCharMap(t)
 	default:
-		panic(fmt.Sprintf("invalid type to print: %T", val))
+		log.Fatalf("error: invalid type to print: %T", val)
 	}
 }
 
-func (cmd *command) printJSON() error {
-	var data interface{} = cmd.data
-	if len(cmd.data) == 1 {
-		data = cmd.data[0]
+func (c *client) printJSON() error {
+	var data interface{} = c.data
+	if len(c.data) == 1 {
+		data = c.data[0]
 	}
-	if err := json.NewEncoder(cmd.out).Encode(data); err != nil {
+	if err := json.NewEncoder(c.out).Encode(data); err != nil {
 		return fmt.Errorf("error encoding to json: %v", err)
 	}
 	return nil
 }
 
-func (cmd *command) printTemplate(tmpl string) error {
-	var data interface{} = cmd.data
-	if len(cmd.data) == 1 {
-		data = cmd.data[0]
+func (c *client) printTemplate(tmpl string) error {
+	var data interface{} = c.data
+	if len(c.data) == 1 {
+		data = c.data[0]
 	}
 	t, err := template.New("pocwebc").Parse(
 		strings.Replace(tmpl, "\\n", "\n", -1))
 	if err != nil {
 		return fmt.Errorf("invalid format string: %v", err)
 	}
-	if err = t.Execute(cmd.out, data); err != nil {
+	if err = t.Execute(c.out, data); err != nil {
 		return fmt.Errorf("error formatting string: %v", err)
 	}
 	return nil
 }
 
-func (cmd *command) printf(format string, args ...interface{}) {
-	if cmd.err != nil {
+func (c *client) printf(format string, args ...interface{}) {
+	if c.err != nil {
 		return
 	}
 	if _, err := fmt.Printf(format, args...); err != nil {
-		cmd.err = err
+		c.err = err
 	}
 }
 
-func (cmd *command) println(args ...interface{}) {
-	if cmd.err != nil {
+func (c *client) println(args ...interface{}) {
+	if c.err != nil {
 		return
 	}
 	if _, err := fmt.Println(args...); err != nil {
-		cmd.err = err
+		c.err = err
 	}
 }
 
-func (cmd *command) printColored(fc, pc bool, cor string) {
-	if cmd.err != nil {
+func (c *client) printColored(fc, pc bool, cor string) {
+	if c.err != nil {
 		return
 	}
 	if fc {
 		_, err := green.Print(cor)
-		cmd.err = err
+		c.err = err
 		return
 	}
 	if pc {
 		_, err := yellow.Print(cor)
-		cmd.err = err
+		c.err = err
 		return
 	}
 	_, err := fmt.Print(cor)
-	cmd.err = err
+	c.err = err
 }
 
-func (cmd *command) printPage(page *api.Page) {
+func (c *client) printPage(page *api.Page) {
 	for _, line := range page.Lines {
-		cmd.printLine(&line)
+		c.printLine(&line)
 	}
 }
 
-func (cmd *command) printLine(line *api.Line) {
+func (c *client) printLine(line *api.Line) {
 	if !printWords {
-		cmd.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
-		cmd.printColored(line.IsFullyCorrected, line.IsPartiallyCorrected, line.Cor)
-		cmd.println()
+		c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
+		c.printColored(line.IsFullyCorrected, line.IsPartiallyCorrected, line.Cor)
+		c.println()
 		return
 	}
-	cmd.printWords(line.Tokens)
+	c.printWords(line.Tokens)
 }
 
-func (cmd *command) printWords(words []api.Token) {
+func (c *client) printWords(words []api.Token) {
 	for i := range words {
-		cmd.printWord(&words[i])
+		c.printWord(&words[i])
 	}
 }
 
-func (cmd *command) printWord(word *api.Token) {
-	cmd.printf("%d:%d:%d:%d ", word.ProjectID, word.PageID, word.LineID, word.Offset)
-	cmd.printColored(word.IsFullyCorrected, word.IsPartiallyCorrected, word.Cor)
-	cmd.println()
+func (c *client) printWord(word *api.Token) {
+	c.printf("%d:%d:%d:%d ", word.ProjectID, word.PageID, word.LineID, word.Offset)
+	c.printColored(word.IsFullyCorrected, word.IsPartiallyCorrected, word.Cor)
+	c.println()
 }
 
-func (cmd *command) printArray(xs []interface{}) {
+func (c *client) printArray(xs []interface{}) {
 	for _, x := range xs {
-		cmd.printVal(x)
+		c.printVal(x)
 	}
 }
 
-func (cmd *command) printSession(s api.Session) {
-	cmd.info("%d\t%s\t%s\t%s\t%s\n",
+func (c *client) printSession(s api.Session) {
+	c.info("%d\t%s\t%s\t%s\t%s\n",
 		s.User.ID, s.User.Email, s.User.Name, s.Auth,
 		time.Unix(s.Expires, 0).Format(time.RFC3339))
 }
 
-func (cmd *command) printVersion(v api.Version) {
-	cmd.println(v.Version)
+func (c *client) printVersion(v api.Version) {
+	c.println(v.Version)
 }
 
-func (cmd *command) printSearchResults(res *api.SearchResults) error {
-	for _, ms := range res.Matches {
-		for _, m := range ms {
-			cmd.printColoredSearchMatches(m)
+func (c *client) printSearchResults(res *api.SearchResults) error {
+	for _, m := range res.Matches {
+		for _, line := range m.Lines {
+			if printWords {
+				c.printSearchMatches(line)
+			} else {
+				c.printColoredSearchMatches(line)
+			}
 		}
 	}
 	return nil
 }
 
-func (cmd *command) printColoredSearchMatches(m api.Match) {
-	cmd.printf("%d:%d:%d", m.Line.ProjectID, m.Line.PageID, m.Line.LineID)
+func (c *client) printSearchMatches(line api.Line) {
+	for _, t := range line.Tokens {
+		if !t.IsMatch {
+			continue
+		}
+		c.info("%d:%d:%d:%d\t%s\n",
+			t.ProjectID, t.PageID, t.LineID, t.Offset, t.Cor)
+	}
+}
+
+func (c *client) printColoredSearchMatches(line api.Line) {
+	c.printf("%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
 	var epos int
-	for _, t := range m.Tokens {
+	for _, t := range line.Tokens {
 		if epos == 0 || t.Offset != epos {
-			cmd.printf(" ")
+			c.printf(" ")
 		}
 		if t.IsMatch {
-			if _, err := red.Fprint(cmd.out, t.Cor); err != nil {
-				cmd.err = err
+			if _, err := red.Fprint(c.out, t.Cor); err != nil {
+				c.err = err
 				return
 			}
 		} else {
-			cmd.printf(t.Cor)
+			c.printf(t.Cor)
 		}
 		corlen := len([]rune(t.Cor))
 		ocrlen := len([]rune(t.OCR))
@@ -368,29 +386,29 @@ func (cmd *command) printColoredSearchMatches(m api.Match) {
 		}
 		epos = t.Offset + maxlen
 	}
-	cmd.println()
+	c.println()
 }
 
-func (cmd *command) printUsers(users api.Users) {
+func (c *client) printUsers(users api.Users) {
 	for _, user := range users.Users {
-		cmd.printUser(user)
+		c.printUser(user)
 	}
 }
 
-func (cmd *command) printUser(user api.User) {
-	cmd.info("%d\t%s\t%s\t%s\t%t\n",
+func (c *client) printUser(user api.User) {
+	c.info("%d\t%s\t%s\t%s\t%t\n",
 		user.ID, user.Name, user.Email, user.Institute, user.Admin)
 }
 
-func (cmd *command) printBooks(books *api.Books) {
+func (c *client) printBooks(books *api.Books) {
 	for _, book := range books.Books {
-		cmd.printBook(&book)
+		c.printBook(&book)
 	}
 }
 
-func (cmd *command) printSplitPackages(packages api.SplitPackages) {
+func (c *client) printSplitPackages(packages api.SplitPackages) {
 	for _, pkg := range packages.Packages {
-		cmd.info("%d\t%d\t%d\t%d\n",
+		c.info("%d\t%d\t%d\t%d\n",
 			packages.BookID, pkg.ProjectID, pkg.Owner, len(pkg.PageIDs))
 	}
 }
@@ -403,8 +421,8 @@ func toStrings(xs []int) []string {
 	return res
 }
 
-func (cmd *command) printBook(book *api.Book) {
-	cmd.info("%d\t%d\t%s\t%s\t%d\t%s\t%s\t%d\t%s\t%s\t%t\n",
+func (c *client) printBook(book *api.Book) {
+	c.info("%d\t%d\t%s\t%s\t%d\t%s\t%s\t%d\t%s\t%s\t%t\n",
 		book.BookID, book.ProjectID, book.Author, book.Title,
 		len(book.PageIDs), book.Description, bookStatusString(book),
 		book.Year, book.Language, book.ProfilerURL, book.IsBook)
@@ -416,7 +434,7 @@ func bookStatusString(book *api.Book) string {
 		res[0] = 'p'
 	}
 	if book.Status["extended-lexicon"] {
-		res[1] = 'l'
+		res[1] = 'e'
 	}
 	if book.Status["post-corrected"] {
 		res[2] = 'c'
@@ -424,113 +442,135 @@ func bookStatusString(book *api.Book) string {
 	return string(res)
 }
 
-func (cmd *command) printModel(model api.Model) {
-	cmd.info("%s\t%s\n", model.Name, model.Description)
+func (c *client) printModel(model api.Model) {
+	c.info("%s\t%s\n", model.Name, model.Description)
 }
 
-func (cmd *command) printModels(models api.Models) {
+func (c *client) printModels(models api.Models) {
 	for _, model := range models.Models {
-		cmd.printModel(model)
+		c.printModel(model)
 	}
 }
 
-func (cmd *command) printFreqMap(bid, pid int, freqs map[string]int, label string) {
+func (c *client) printFreqMap(bid, pid int, freqs map[string]int, label string) {
 	for k, v := range freqs {
-		cmd.info("%d\t%d\t%s\t%d\t%s\n", bid, pid, k, v, label)
+		c.info("%d\t%d\t%s\t%d\t%s\n", bid, pid, k, v, label)
 	}
 }
 
-func (cmd *command) printExtendedLexicon(el api.ExtendedLexicon) {
-	cmd.printFreqMap(el.BookID, el.ProjectID, el.Yes, "yes")
-	cmd.printFreqMap(el.BookID, el.ProjectID, el.No, "no")
+func (c *client) printExtendedLexicon(el api.ExtendedLexicon) {
+	c.printFreqMap(el.BookID, el.ProjectID, el.Yes, "yes")
+	c.printFreqMap(el.BookID, el.ProjectID, el.No, "no")
 }
 
-func (cmd *command) printPostCorrection(pc *api.PostCorrection) {
-	cmd.printFreqMap(pc.BookID, pc.ProjectID, pc.Always, "always")
-	cmd.printFreqMap(pc.BookID, pc.ProjectID, pc.Sometimes, "sometimes")
-	cmd.printFreqMap(pc.BookID, pc.ProjectID, pc.Never, "never")
+func (c *client) printPostCorrection(pc *api.PostCorrection) {
+	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Always, "always")
+	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Sometimes, "sometimes")
+	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Never, "never")
 }
 
-func (cmd *command) printCharMap(cm api.CharMap) {
+func (c *client) printCharMap(cm api.CharMap) {
 	for k, v := range cm.CharMap {
-		cmd.info("%d\t%d\t%s\t%d\n", cm.BookID, cm.ProjectID, k, v)
+		c.info("%d\t%d\t%s\t%d\n", cm.BookID, cm.ProjectID, k, v)
 	}
 }
 
-func (cmd *command) printProfile(profile gofiler.Profile) {
-	for _, v := range profile {
+func (c *client) printProfile(profile gofiler.Profile) {
+	pats := func(pats []gofiler.Pattern) []string {
+		var ret []string
+		for _, pat := range pats {
+			ret = append(ret, fmt.Sprintf("%s:%s:%d",
+				pat.Left, pat.Right, pat.Pos))
+		}
+		return ret
+	}
+	for k, v := range profile {
 		top := true
-		for _, c := range v.Candidates {
-			cmd.info("%s\t%s\t%d\t%f\t%t\n",
-				v.OCR, c.Suggestion, c.Distance, c.Weight, top)
+		for _, cand := range v.Candidates {
+			c.printSuggestion("", api.Suggestion{
+				Token:        k,
+				Suggestion:   cand.Suggestion,
+				Modern:       cand.Modern,
+				Distance:     cand.Distance,
+				Weight:       float64(cand.Weight),
+				HistPatterns: pats(cand.HistPatterns),
+				OCRPatterns:  pats(cand.OCRPatterns),
+				Top:          top,
+			})
+			// c.info("%s\t%s\t%d\t%f\t%t\n",
+			// 	v.OCR, c.Suggestion, c.Distance, c.Weight, top)
 			top = false
 		}
 	}
 }
 
-func (cmd *command) printSuggestions(ss api.Suggestions) {
+func (c *client) printSuggestions(ss api.Suggestions) {
 	for _, s := range ss.Suggestions {
-		cmd.printSuggestionsArray("", s)
+		c.printSuggestionsArray("", s)
 	}
 }
 
-func (cmd *command) printSuggestionCounts(counts api.SuggestionCounts) {
+func (c *client) printSuggestionCounts(counts api.SuggestionCounts) {
 	for k, v := range counts.Counts {
-		cmd.info("%d\t%d\t%s\t%d\n", counts.BookID, counts.ProjectID, k, v)
+		c.info("%d\t%d\t%s\t%d\n", counts.BookID, counts.ProjectID, k, v)
 	}
 }
 
-func (cmd *command) printSuggestionsArray(pre string, suggestions []api.Suggestion) {
+func (c *client) printSuggestionsArray(pre string, suggestions []api.Suggestion) {
 	for _, s := range suggestions {
-		cmd.info("%s%s\t%s\t%s\t%s\t%s\t%s\t%d\t%f\t%t\n",
-			pre, s.Token, s.Suggestion, s.Modern,
-			strings.Join(s.HistPatterns, ","), strings.Join(s.OCRPatterns, ","),
-			s.Dict, s.Distance, s.Weight, s.Top)
+		c.printSuggestion("", s)
 	}
 }
 
-func (cmd *command) printPatterns(patterns api.Patterns) {
+func (c *client) printSuggestion(pre string, s api.Suggestion) {
+	c.info("%s%s\t%s\t%s\t%s\t%s\t%s\t%d\t%f\t%t\n",
+		pre, s.Token, s.Suggestion, s.Modern,
+		strings.Join(s.HistPatterns, ","), strings.Join(s.OCRPatterns, ","),
+		s.Dict, s.Distance, s.Weight, s.Top)
+}
+
+func (c *client) printPatterns(patterns api.Patterns) {
 	for p, v := range patterns.Patterns {
-		cmd.printSuggestionsArray(p+"\t", v)
+		c.printSuggestionsArray(p+"\t", v)
 	}
 }
 
-func (cmd *command) printPatternCounts(counts api.PatternCounts) {
+func (c *client) printPatternCounts(counts api.PatternCounts) {
 	for k, v := range counts.Counts {
-		cmd.info("%d\t%d\t%s\t%d\t%t\n",
+		c.info("%d\t%d\t%s\t%d\t%t\n",
 			counts.BookID, counts.ProjectID, k, v, counts.OCR)
 	}
 }
 
-func (cmd *command) printAdaptiveTokens(at api.AdaptiveTokens) {
+func (c *client) printAdaptiveTokens(at api.AdaptiveTokens) {
 	for _, t := range at.AdaptiveTokens {
-		cmd.info("%d\t%d\t%s\n", at.BookID, at.ProjectID, t)
+		c.info("%d\t%d\t%s\n", at.BookID, at.ProjectID, t)
 	}
 }
 
-func (cmd *command) info(format string, args ...interface{}) {
-	if cmd.err != nil {
+func (c *client) info(format string, args ...interface{}) {
+	if c.err != nil {
 		return
 	}
 	str := fmt.Sprintf(format, args...)
 	str = strings.Replace(str, " ", "_", -1)
 	str = strings.Replace(str, "\t", " ", -1)
-	_, err := fmt.Fprint(cmd.out, str)
-	cmd.err = err
+	_, err := fmt.Fprint(c.out, str)
+	c.err = err
 }
 
 func getURL() string {
 	if pocowebURL != "" {
 		return pocowebURL
 	}
-	return os.Getenv("POCOWEBC_URL")
+	return os.Getenv("PCWCLIENT_URL")
 }
 
 func getAuth() string {
 	if authToken != "" {
 		return authToken
 	}
-	return os.Getenv("POCOWEBC_AUTH")
+	return os.Getenv("PCWCLIENT_AUTH")
 }
 
 func unescape(args ...string) []string {

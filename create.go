@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
@@ -43,6 +44,8 @@ func init() {
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "name")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "email")
 	cobra.MarkFlagRequired(createUserCommand.Flags(), "password")
+	createPackagesCommand.Flags().BoolVarP(&splitRandom, "random", "r",
+		false, "create random packages")
 }
 
 var createCommand = cobra.Command{
@@ -86,8 +89,8 @@ func createBook(p string, out io.Writer) error {
 	defer func() {
 		zip.Close()
 	}()
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
 		return client.PostBook(zip, api.Book{
 			Title:       bookTitle,
 			Author:      bookAuthor,
@@ -97,7 +100,7 @@ func createBook(p string, out io.Writer) error {
 			ProfilerURL: bookProfilerURL,
 		})
 	})
-	return cmd.done()
+	return c.done()
 }
 
 func openAsZIP(p string) (io.ReadCloser, error) {
@@ -166,8 +169,8 @@ func createUser(out io.Writer) error {
 	if userEmail == "" || userPassword == "" {
 		return fmt.Errorf("missing user email and/or password")
 	}
-	cmd := newCommand(out)
-	cmd.do(func(client *api.Client) (interface{}, error) {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
 		return client.PostUser(api.CreateUserRequest{
 			User: api.User{
 				Name:      userName,
@@ -178,5 +181,43 @@ func createUser(out io.Writer) error {
 			Password: userPassword,
 		})
 	})
-	return cmd.done()
+	return c.done()
+}
+
+var createPackagesCommand = cobra.Command{
+	Use:   "pkgs ID USERID [USERID...]",
+	Short: "Split the project ID into multiple packages",
+	Long: `
+Split the project ID into multiple packages.  The project is split
+into N packages where N is the number of given USERIDs.  Each project
+is assigned to the given users in order.
+
+E.g. "pocowebc new pkgs 13 1 2 3" splits the project 13 into 3
+packages.  The first package is owned by user 1, the second by user 2
+and the third by user 3.`,
+	RunE: doSplit,
+	Args: cobra.MinimumNArgs(2),
+}
+
+func doSplit(cmd *cobra.Command, args []string) error {
+	var ids []int
+	for _, arg := range args {
+		id, err := strconv.Atoi(arg)
+		if err != nil {
+			return fmt.Errorf("split: invalid id: %s", arg)
+		}
+		ids = append(ids, id)
+	}
+	if err := split(os.Stdout, ids[0], ids[1:]); err != nil {
+		return fmt.Errorf("split: %v", err)
+	}
+	return nil
+}
+
+func split(out io.Writer, bid int, userids []int) error {
+	c := newClient(out)
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.Split(bid, splitRandom, userids[0], userids[1:]...)
+	})
+	return c.done()
 }

@@ -28,11 +28,11 @@ func init() {
 		"set the number of seconds to sleep between checks if the job has finished")
 }
 
-func reattach(cmd *command, jobID int) bool {
+func reattach(c *client, jobID int) bool {
 	var res bool
 	if !startNoWait {
-		cmd.do(func(client *api.Client) (interface{}, error) {
-			status, err := cmd.client.GetJobStatus(jobID)
+		c.do(func(client *api.Client) (interface{}, error) {
+			status, err := c.client.GetJobStatus(jobID)
 			if err != nil {
 				return nil, err
 			}
@@ -46,8 +46,8 @@ func reattach(cmd *command, jobID int) bool {
 	return res
 }
 
-func waitForJobToFinish(cmd *command, jobID int) {
-	cmd.do(func(client *api.Client) (interface{}, error) {
+func waitForJobToFinish(c *client, jobID int) {
+	c.do(func(client *api.Client) (interface{}, error) {
 		for !startNoWait {
 			status, err := client.GetJobStatus(jobID)
 			if err != nil {
@@ -78,18 +78,18 @@ func doProfile(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book ID: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	// start profiling
 	jobID := bid
-	if !reattach(&cmd, jobID) {
-		cmd.do(func(client *api.Client) (interface{}, error) {
+	if !reattach(c, jobID) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			job, err := client.PostProfile(bid, args[1:]...)
 			jobID = job.ID
 			return nil, err
 		})
 	}
-	waitForJobToFinish(&cmd, jobID)
-	return cmd.done()
+	waitForJobToFinish(c, jobID)
+	return c.done()
 }
 
 var startELCommand = cobra.Command{
@@ -104,23 +104,23 @@ func doEL(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book ID: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	// start profiling
 	jobID := bid
-	if !reattach(&cmd, jobID) {
-		cmd.do(func(client *api.Client) (interface{}, error) {
+	if !reattach(c, jobID) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			job, err := client.PostExtendedLexicon(bid)
 			jobID = job.ID
 			return nil, err
 		})
 	}
-	waitForJobToFinish(&cmd, jobID)
+	waitForJobToFinish(c, jobID)
 	if !startNoWait {
-		cmd.do(func(client *api.Client) (interface{}, error) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			return client.GetExtendedLexicon(bid)
 		})
 	}
-	return cmd.done()
+	return c.done()
 }
 
 var startRRDMCommand = cobra.Command{
@@ -135,18 +135,18 @@ func doRRDM(_ *cobra.Command, args []string) error {
 	if n := parseIDs(args[0], &bid); n != 1 {
 		return fmt.Errorf("invalid book ID: %q", args[0])
 	}
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	// start profiling
 	jobID := bid
-	if !reattach(&cmd, jobID) {
-		cmd.do(func(client *api.Client) (interface{}, error) {
+	if !reattach(c, jobID) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			job, err := client.PostPostCorrection(bid)
 			jobID = job.ID
 			return nil, err
 		})
 	}
-	waitForJobToFinish(&cmd, jobID)
-	return cmd.done()
+	waitForJobToFinish(c, jobID)
+	return c.done()
 }
 
 var startPredictCommand = cobra.Command{
@@ -161,17 +161,17 @@ func doPredict(_ *cobra.Command, args []string) error {
 	if parseIDs(args[0], &bid, &pid, &lid) == 0 {
 		return fmt.Errorf("invalid book id: %s", args[0])
 	}
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	jobID := bid
-	if !reattach(&cmd, jobID) {
-		cmd.do(func(client *api.Client) (interface{}, error) {
+	if !reattach(c, jobID) {
+		c.do(func(client *api.Client) (interface{}, error) {
 			job, err := client.OCRPredict(bid, pid, lid, args[1])
 			jobID = job.ID
 			return nil, err
 		})
 	}
-	waitForJobToFinish(&cmd, jobID)
-	return cmd.done()
+	waitForJobToFinish(c, jobID)
+	return c.done()
 }
 
 var startTrainCommand = cobra.Command{
@@ -186,15 +186,15 @@ func doTrain(_ *cobra.Command, args []string) error {
 	if parseIDs(args[0], &bid) != 1 {
 		return fmt.Errorf("invalid book id: %s", args[0])
 	}
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	jobID := bid
-	if !reattach(&cmd, jobID) {
-		cmd.do(func(client *api.Client) (interface{}, error) {
-			job, err := cmd.client.OCRTrain(bid, args[1])
+	if !reattach(c, jobID) {
+		c.do(func(client *api.Client) (interface{}, error) {
+			job, err := c.client.OCRTrain(bid, args[1])
 			jobID = job.ID
 			return nil, err
 		})
 	}
-	waitForJobToFinish(&cmd, jobID)
-	return cmd.done()
+	waitForJobToFinish(c, jobID)
+	return c.done()
 }

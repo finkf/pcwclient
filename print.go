@@ -25,56 +25,81 @@ var printCommand = cobra.Command{
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
-	cmd := newCommand(os.Stdout)
+	c := newClient(os.Stdout)
 	for _, id := range args {
 		var bid, pid, lid, wid, len int
 		switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 		case 5:
-			getWord(&cmd, bid, pid, lid, wid, len)
+			getWord(c, bid, pid, lid, wid, len)
 		case 4:
-			getWord(&cmd, bid, pid, lid, wid, -1)
+			getWord(c, bid, pid, lid, wid, -1)
 		case 3:
-			getLine(&cmd, bid, pid, lid)
+			getLine(c, bid, pid, lid)
 		case 2:
-			getPage(&cmd, bid, pid)
+			getPage(c, bid, pid)
 		case 1:
-			getPages(&cmd, bid)
+			getPages(c, bid)
 		default:
 			return fmt.Errorf("invalid id: %s", id)
 		}
 	}
-	return cmd.done()
+	return c.done()
 }
 
-func getPages(cmd *command, bid int) {
-	var book *api.Book
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		var err error
-		book, err = client.GetBook(bid)
-		return nil, err
-	})
-	for _, pid := range book.PageIDs {
-		getPage(cmd, book.ProjectID, pid)
+func getPages(c *client, bid int) {
+	pageid := 0
+	done := false
+	for !done {
+		c.do(func(client *api.Client) (interface{}, error) {
+			page, err := getPageImpl(client, bid, pageid)
+			if err != nil {
+				done = true
+				return nil, err
+			}
+			if page.PageID == page.NextPageID {
+				done = true
+			}
+			pageid = page.NextPageID
+			return page, nil
+		})
 	}
 }
 
-func getPage(cmd *command, bid, pid int) {
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return client.GetPage(bid, pid)
-	})
-}
-
-func getLine(cmd *command, bid, pid, lid int) {
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		return cmd.client.GetLine(bid, pid, lid)
-	})
-}
-
-func getWord(cmd *command, bid, pid, lid, wid, len int) {
-	cmd.do(func(client *api.Client) (interface{}, error) {
-		if len == -1 {
-			return cmd.client.GetToken(bid, pid, lid, wid)
+func getPage(c *client, bid, pid int) {
+	c.do(func(client *api.Client) (interface{}, error) {
+		switch pid {
+		case 0:
+			return client.GetFirstPage(bid)
+		case -1:
+			return client.GetLastPage(bid)
+		default:
+			return client.GetPage(bid, pid)
 		}
-		return cmd.client.GetTokenLen(bid, pid, lid, wid, len)
+	})
+}
+
+func getPageImpl(client *api.Client, bid, pid int) (*api.Page, error) {
+	switch pid {
+	case 0:
+		return client.GetFirstPage(bid)
+	case -1:
+		return client.GetLastPage(bid)
+	default:
+		return client.GetPage(bid, pid)
+	}
+}
+
+func getLine(c *client, bid, pid, lid int) {
+	c.do(func(client *api.Client) (interface{}, error) {
+		return c.client.GetLine(bid, pid, lid)
+	})
+}
+
+func getWord(c *client, bid, pid, lid, wid, len int) {
+	c.do(func(client *api.Client) (interface{}, error) {
+		if len == -1 {
+			return c.client.GetToken(bid, pid, lid, wid)
+		}
+		return c.client.GetTokenLen(bid, pid, lid, wid, len)
 	})
 }
