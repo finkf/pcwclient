@@ -13,12 +13,12 @@ import (
 )
 
 var correctCommand = cobra.Command{
-	Use:   "correct [ID CORRECTION...]",
+	Use:   "correct [ID CORRECTION]...",
 	Short: "Correct lines or words",
 	Args: func(c *cobra.Command, args []string) error {
 		// zero or 2+ args
-		if len(args) == 1 {
-			return fmt.Errorf("expected exactly 0 or at least 2 args")
+		if len(args)%2 != 0 || len(args) == 0 {
+			return fmt.Errorf("expected an even number of arugments")
 		}
 		return nil
 	},
@@ -26,8 +26,13 @@ var correctCommand = cobra.Command{
 }
 
 func doCorrect(c *cobra.Command, args []string) error {
-	if len(args) >= 2 {
-		return correct(os.Stdout, args[0], strings.Join(args[1:], " "))
+	for i := 1; i < len(args); i += 2 {
+		if err := correct(os.Stdout, args[i-1], args[i]); err != nil {
+			return err
+		}
+	}
+	if len(args) > 0 {
+		return nil
 	}
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
