@@ -121,6 +121,11 @@ func parseIDs(id string, ids ...*int) int {
 	return i
 }
 
+type line struct {
+	line     *api.Line
+	ocr, cor bool
+}
+
 type client struct {
 	client *api.Client
 	data   []interface{}
@@ -304,9 +309,18 @@ func (c *client) printPage(page *api.Page) {
 
 func (c *client) printLine(line *api.Line) {
 	if !printWords {
-		c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
-		c.printColored(line.IsFullyCorrected, line.IsPartiallyCorrected, line.Cor)
-		c.println()
+		if !line.IsFullyCorrected && skipNonCor {
+			return
+		}
+		if printCor {
+			c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
+			c.printColored(line.IsFullyCorrected, line.IsPartiallyCorrected, line.Cor)
+			c.println()
+		}
+		if printOCR {
+			c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
+			c.println(line.OCR)
+		}
 		return
 	}
 	c.printWords(line.Tokens)
@@ -314,14 +328,25 @@ func (c *client) printLine(line *api.Line) {
 
 func (c *client) printWords(words []api.Token) {
 	for i := range words {
+		if !words[i].IsFullyCorrected && skipNonCor {
+			continue
+		}
 		c.printWord(&words[i])
 	}
 }
 
 func (c *client) printWord(word *api.Token) {
-	c.printf("%d:%d:%d:%d ", word.ProjectID, word.PageID, word.LineID, word.Offset)
-	c.printColored(word.IsFullyCorrected, word.IsPartiallyCorrected, word.Cor)
-	c.println()
+	if printCor {
+		c.printf("%d:%d:%d:%d ",
+			word.ProjectID, word.PageID, word.LineID, word.Offset)
+		c.printColored(word.IsFullyCorrected, word.IsPartiallyCorrected, word.Cor)
+		c.println()
+	}
+	if printOCR {
+		c.printf("%d:%d:%d:%d ",
+			word.ProjectID, word.PageID, word.LineID, word.Offset)
+		c.println(word.OCR)
+	}
 }
 
 func (c *client) printArray(xs []interface{}) {

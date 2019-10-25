@@ -10,11 +10,20 @@ import (
 
 var (
 	printWords bool
+	printOCR   bool
+	printCor   bool
+	skipNonCor bool
 )
 
 func init() {
 	printCommand.Flags().BoolVarP(&printWords, "words", "w", false,
 		"print words not lines")
+	printCommand.Flags().BoolVarP(&printOCR, "ocr", "o", false,
+		"print ocr lines instead of cor")
+	printCommand.Flags().BoolVarP(&printCor, "cor", "c", false,
+		"print corrected lines (set to print ocr and cor lines)")
+	printCommand.Flags().BoolVarP(&skipNonCor, "skip", "s", false,
+		"skip non corrected lines/words")
 }
 
 var printCommand = cobra.Command{
@@ -25,6 +34,9 @@ var printCommand = cobra.Command{
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
+	if !printOCR && !printCor {
+		printCor = true
+	}
 	c := newClient(os.Stdout)
 	for _, id := range args {
 		var bid, pid, lid, wid, len int
