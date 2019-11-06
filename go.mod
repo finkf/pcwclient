@@ -14,6 +14,4 @@ require (
 	golang.org/x/sys v0.0.0-20191105231009-c1f44814a5cd // indirect
 )
 
-replace github.com/finkf/pcwgo v0.7.4 => ../pcwgo
-
 go 1.13
