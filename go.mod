@@ -3,7 +3,7 @@ module github.com/finkf/pcwclient
 require (
 	github.com/fatih/color v1.7.0
 	github.com/finkf/gofiler v0.2.0
-	github.com/finkf/pcwgo v0.7.1
+	github.com/finkf/pcwgo v0.7.2
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
