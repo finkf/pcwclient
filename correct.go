@@ -12,6 +12,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var manualCorrected bool
+
+func init() {
+	printCommand.Flags().BoolVarP(&manualCorrected, "manual", "m",
+		false, "mark correction as manual")
+}
+
 var correctCommand = cobra.Command{
 	Use:   "correct [ID CORRECTION]...",
 	Short: "Correct lines or words",
@@ -52,20 +59,24 @@ func correct(out io.Writer, id, correction string) error {
 	if err != nil {
 		return err
 	}
+	cor := api.CorrectionRequest{
+		Correction: u,
+		Manually:   manualCorrected,
+	}
 	var bid, pid, lid, wid, len int
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 3:
-		return correctLine(os.Stdout, bid, pid, lid, u)
+		return correctLine(os.Stdout, bid, pid, lid, cor)
 	case 4:
-		return correctWord(os.Stdout, bid, pid, lid, wid, -1, u)
+		return correctWord(os.Stdout, bid, pid, lid, wid, -1, cor)
 	case 5:
-		return correctWord(os.Stdout, bid, pid, lid, wid, len, u)
+		return correctWord(os.Stdout, bid, pid, lid, wid, len, cor)
 	default:
 		return fmt.Errorf("invalid id: %q", id)
 	}
 }
 
-func correctLine(out io.Writer, bid, pid, lid int, cor string) error {
+func correctLine(out io.Writer, bid, pid, lid int, cor api.CorrectionRequest) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
 		return client.PutLine(bid, pid, lid, cor)
@@ -73,7 +84,7 @@ func correctLine(out io.Writer, bid, pid, lid int, cor string) error {
 	return c.done()
 }
 
-func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor string) error {
+func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor api.CorrectionRequest) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
 		if len == -1 {

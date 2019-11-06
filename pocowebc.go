@@ -65,7 +65,6 @@ func init() {
 	listCommand.AddCommand(&listAdaptiveCommand)
 	listCommand.AddCommand(&listELCommand)
 	listCommand.AddCommand(&listRRDMCommand)
-	listCommand.AddCommand(&listOCRModelsCommand)
 	listCommand.AddCommand(&listCharsCommand)
 	createCommand.AddCommand(&createUserCommand)
 	createCommand.AddCommand(&createBookCommand)
@@ -73,8 +72,6 @@ func init() {
 	startCommand.AddCommand(&startProfileCommand)
 	startCommand.AddCommand(&startELCommand)
 	startCommand.AddCommand(&startRRDMCommand)
-	startCommand.AddCommand(&startPredictCommand)
-	startCommand.AddCommand(&startTrainCommand)
 	deleteCommand.AddCommand(&deleteBooksCommand)
 	deleteCommand.AddCommand(&deleteUsersCommand)
 	mainCommand.SilenceUsage = true
@@ -119,11 +116,6 @@ func parseIDs(id string, ids ...*int) int {
 		*ids[i] = id
 	}
 	return i
-}
-
-type line struct {
-	line     *api.Line
-	ocr, cor bool
 }
 
 type client struct {
@@ -173,7 +165,12 @@ func (c *client) print(val interface{}) {
 	}
 	// cache printout data for json or format output
 	if jsonOutput || formatString != "" {
-		c.data = append(c.data, val)
+		switch t := val.(type) {
+		case formatter:
+			c.data = append(c.data, t.underlying())
+		default:
+			c.data = append(c.data, val)
+		}
 		return
 	}
 	if val != nil {
@@ -187,14 +184,8 @@ func (c *client) printVal(val interface{}) {
 	}
 	// just print the given value
 	switch t := val.(type) {
-	case *api.Page:
-		c.printPage(t)
-	case *api.Line:
-		c.printLine(t)
-	case *api.Token:
-		c.printWord(t)
-	case []api.Token:
-		c.printWords(t)
+	case formatter:
+		c.err = t.format(os.Stdout)
 	case []interface{}:
 		c.printArray(t)
 	case api.Session:
@@ -211,8 +202,6 @@ func (c *client) printVal(val interface{}) {
 		c.printUser(t)
 	case api.Users:
 		c.printUsers(t)
-	case *api.SearchResults:
-		c.printSearchResults(t)
 	case gofiler.Profile:
 		c.printProfile(t)
 	case api.Suggestions:
@@ -301,54 +290,6 @@ func (c *client) printColored(fc, pc bool, cor string) {
 	c.err = err
 }
 
-func (c *client) printPage(page *api.Page) {
-	for _, line := range page.Lines {
-		c.printLine(&line)
-	}
-}
-
-func (c *client) printLine(line *api.Line) {
-	if !printWords {
-		if !line.IsFullyCorrected && skipNonCor {
-			return
-		}
-		if printCor {
-			c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
-			c.printColored(line.IsFullyCorrected, line.IsPartiallyCorrected, line.Cor)
-			c.println()
-		}
-		if printOCR {
-			c.printf("%d:%d:%d ", line.ProjectID, line.PageID, line.LineID)
-			c.println(line.OCR)
-		}
-		return
-	}
-	c.printWords(line.Tokens)
-}
-
-func (c *client) printWords(words []api.Token) {
-	for i := range words {
-		if !words[i].IsFullyCorrected && skipNonCor {
-			continue
-		}
-		c.printWord(&words[i])
-	}
-}
-
-func (c *client) printWord(word *api.Token) {
-	if printCor {
-		c.printf("%d:%d:%d:%d ",
-			word.ProjectID, word.PageID, word.LineID, word.Offset)
-		c.printColored(word.IsFullyCorrected, word.IsPartiallyCorrected, word.Cor)
-		c.println()
-	}
-	if printOCR {
-		c.printf("%d:%d:%d:%d ",
-			word.ProjectID, word.PageID, word.LineID, word.Offset)
-		c.println(word.OCR)
-	}
-}
-
 func (c *client) printArray(xs []interface{}) {
 	for _, x := range xs {
 		c.printVal(x)
@@ -363,55 +304,6 @@ func (c *client) printSession(s api.Session) {
 
 func (c *client) printVersion(v api.Version) {
 	c.println(v.Version)
-}
-
-func (c *client) printSearchResults(res *api.SearchResults) error {
-	for _, m := range res.Matches {
-		for _, line := range m.Lines {
-			if printWords {
-				c.printSearchMatches(line)
-			} else {
-				c.printColoredSearchMatches(line)
-			}
-		}
-	}
-	return nil
-}
-
-func (c *client) printSearchMatches(line api.Line) {
-	for _, t := range line.Tokens {
-		if !t.IsMatch {
-			continue
-		}
-		c.info("%d:%d:%d:%d\t%s\n",
-			t.ProjectID, t.PageID, t.LineID, t.Offset, t.Cor)
-	}
-}
-
-func (c *client) printColoredSearchMatches(line api.Line) {
-	c.printf("%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
-	var epos int
-	for _, t := range line.Tokens {
-		if epos == 0 || t.Offset != epos {
-			c.printf(" ")
-		}
-		if t.IsMatch {
-			if _, err := red.Fprint(c.out, t.Cor); err != nil {
-				c.err = err
-				return
-			}
-		} else {
-			c.printf(t.Cor)
-		}
-		corlen := len([]rune(t.Cor))
-		ocrlen := len([]rune(t.OCR))
-		maxlen := corlen
-		if maxlen < ocrlen {
-			maxlen = ocrlen
-		}
-		epos = t.Offset + maxlen
-	}
-	c.println()
 }
 
 func (c *client) printUsers(users api.Users) {
@@ -489,9 +381,44 @@ func (c *client) printExtendedLexicon(el api.ExtendedLexicon) {
 }
 
 func (c *client) printPostCorrection(pc *api.PostCorrection) {
-	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Always, "always")
-	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Sometimes, "sometimes")
-	c.printFreqMap(pc.BookID, pc.ProjectID, pc.Never, "never")
+	classify := func(ts []api.PostCorrectionToken) string {
+		never := true
+		always := true
+		for _, t := range ts {
+			if t.Taken {
+				never = false
+			} else {
+				always = false
+			}
+		}
+		if never {
+			return "never"
+		}
+		if always {
+			return "always"
+		}
+		return "sometimes"
+	}
+	types := make(map[string][]api.PostCorrectionToken)
+	for _, token := range pc.Corrections {
+		types[token.Normalized] = append(types[token.Normalized], token)
+	}
+	always := make(map[string]int)
+	sometimes := make(map[string]int)
+	never := make(map[string]int)
+	for n, ts := range types {
+		switch classify(ts) {
+		case "never":
+			never[n] = len(ts)
+		case "always":
+			always[n] = len(ts)
+		default:
+			sometimes[n] = len(ts)
+		}
+	}
+	c.printFreqMap(pc.BookID, pc.ProjectID, always, "always")
+	c.printFreqMap(pc.BookID, pc.ProjectID, sometimes, "sometimes")
+	c.printFreqMap(pc.BookID, pc.ProjectID, never, "never")
 }
 
 func (c *client) printCharMap(cm api.CharMap) {

@@ -19,6 +19,8 @@ func init() {
 		false, "print out matched words")
 	searchCommand.Flags().BoolVarP(&searchAll, "all", "a",
 		false, "search for all matches")
+	searchCommand.Flags().BoolVarP(&searchIC, "ignore-case", "i",
+		false, "ignore case for search")
 	searchCommand.Flags().IntVarP(&searchMax, "max", "m",
 		50, "set max matches")
 	searchCommand.Flags().IntVarP(&searchSkip, "skip", "s",
@@ -51,7 +53,7 @@ func login(out io.Writer, user, password string) error {
 	}
 	url := getURL()
 	if url == "" {
-		return fmt.Errorf("missing url: use --url, or POCOWEBC_URL")
+		return fmt.Errorf("missing url: use --url or PCWCLIENT_URL")
 	}
 	login, err := api.Login(url, user, password, skipVerify)
 	if err != nil {
@@ -144,6 +146,7 @@ var (
 	searchMax  int
 	searchType string
 	searchAll  bool
+	searchIC   bool
 )
 
 func searchTypeFromString(typ string) (api.SearchType, error) {
@@ -168,20 +171,22 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	return search(os.Stdout, id, api.Search{
-		Qs:   args[1:],
-		Skip: searchSkip,
-		Max:  searchMax,
-		Type: typ,
-	})
+	return search(os.Stdout, id, typ, args[1:]...)
 }
 
-func search(out io.Writer, id int, s api.Search) error {
+func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 	c := newClient(out)
 	var done bool
 	for !done && c.err == nil {
 		c.do(func(client *api.Client) (interface{}, error) {
-			ret, err := client.Search(id, s)
+			s := api.Search{
+				Client: *client,
+				Skip:   searchSkip,
+				Max:    searchMax,
+				IC:     searchIC,
+				Type:   typ,
+			}
+			ret, err := s.Search(id, qs...)
 			if err != nil {
 				return nil, err
 			}
@@ -192,7 +197,10 @@ func search(out io.Writer, id int, s api.Search) error {
 			if !searchAll {
 				done = true
 			}
-			return ret, err
+			return searchF{
+				results: ret,
+				words:   printWords,
+			}, err
 		})
 	}
 	return c.done()

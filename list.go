@@ -170,7 +170,8 @@ func listAllSuggestions(out io.Writer, id int) error {
 func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.QueryProfile(id, q, qs...)
+		s, err := c.client.QueryProfile(id, q, qs...)
+		return suggestionsF{s}, err
 	})
 	return c.done()
 }
@@ -247,25 +248,6 @@ func doListRRDM(_ *cobra.Command, args []string) error {
 	c := newClient(os.Stdout)
 	c.do(func(client *api.Client) (interface{}, error) {
 		return c.client.GetPostCorrection(bid)
-	})
-	return c.done()
-}
-
-var listOCRModelsCommand = cobra.Command{
-	Use:   "ocr ID",
-	Short: "List available ocr models",
-	Args:  exactlyNIDs(1),
-	RunE:  doListOCRModels,
-}
-
-func doListOCRModels(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
-	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetOCRModels(bid)
 	})
 	return c.done()
 }

@@ -63,30 +63,45 @@ func getPages(c *client, bid int) {
 	done := false
 	for !done {
 		c.do(func(client *api.Client) (interface{}, error) {
-			page, err := getPageImpl(client, bid, pageid)
+			p, err := getPageImpl(client, bid, pageid)
 			if err != nil {
 				done = true
 				return nil, err
 			}
-			if page.PageID == page.NextPageID {
+			if p.PageID == p.NextPageID {
 				done = true
 			}
-			pageid = page.NextPageID
-			return page, nil
+			pageid = p.NextPageID
+			return pageF{
+				page:  p,
+				cor:   printCor,
+				ocr:   printOCR,
+				words: printWords,
+				skip:  skipNonCor,
+			}, nil
 		})
 	}
 }
 
 func getPage(c *client, bid, pid int) {
 	c.do(func(client *api.Client) (interface{}, error) {
+		var p *api.Page
+		var err error
 		switch pid {
 		case 0:
-			return client.GetFirstPage(bid)
+			p, err = client.GetFirstPage(bid)
 		case -1:
-			return client.GetLastPage(bid)
+			p, err = client.GetLastPage(bid)
 		default:
-			return client.GetPage(bid, pid)
+			p, err = client.GetPage(bid, pid)
 		}
+		return pageF{
+			page:  p,
+			cor:   printCor,
+			ocr:   printOCR,
+			words: printWords,
+			skip:  skipNonCor,
+		}, err
 	})
 }
 
@@ -103,15 +118,32 @@ func getPageImpl(client *api.Client, bid, pid int) (*api.Page, error) {
 
 func getLine(c *client, bid, pid, lid int) {
 	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetLine(bid, pid, lid)
+		l, err := c.client.GetLine(bid, pid, lid)
+		return lineF{
+			line:  l,
+			cor:   printCor,
+			ocr:   printOCR,
+			words: printWords,
+			skip:  skipNonCor,
+		}, err
 	})
 }
 
 func getWord(c *client, bid, pid, lid, wid, len int) {
 	c.do(func(client *api.Client) (interface{}, error) {
-		if len == -1 {
-			return c.client.GetToken(bid, pid, lid, wid)
+		var err error
+		var t *api.Token
+		switch len {
+		case -1:
+			t, err = c.client.GetToken(bid, pid, lid, wid)
+		default:
+			t, err = c.client.GetTokenLen(bid, pid, lid, wid, len)
 		}
-		return c.client.GetTokenLen(bid, pid, lid, wid, len)
+		return tokenF{
+			token: t,
+			cor:   printCor,
+			ocr:   printOCR,
+			skip:  skipNonCor,
+		}, err
 	})
 }
