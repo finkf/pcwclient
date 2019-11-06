@@ -52,6 +52,7 @@ func init() {
 	mainCommand.AddCommand(&correctCommand)
 	mainCommand.AddCommand(&downloadCommand)
 	mainCommand.AddCommand(&pkgCommand)
+	mainCommand.AddCommand(&poolCommand)
 	pkgCommand.AddCommand(&assignCommand)
 	pkgCommand.AddCommand(&takeBackCommand)
 	mainCommand.AddCommand(&deleteCommand)
@@ -74,6 +75,9 @@ func init() {
 	startCommand.AddCommand(&startRRDMCommand)
 	deleteCommand.AddCommand(&deleteBooksCommand)
 	deleteCommand.AddCommand(&deleteUsersCommand)
+	poolCommand.AddCommand(&downloadPoolCommand)
+	poolCommand.AddCommand(&runPoolCommand)
+
 	mainCommand.SilenceUsage = true
 	mainCommand.SilenceErrors = true
 	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
@@ -147,6 +151,7 @@ func (c *client) do(f func(*api.Client) (interface{}, error)) {
 }
 
 func (c *client) done() error {
+	log.Debugf("done")
 	if c.err != nil {
 		return c.err
 	}
@@ -254,15 +259,6 @@ func (c *client) printTemplate(tmpl string) error {
 	return nil
 }
 
-func (c *client) printf(format string, args ...interface{}) {
-	if c.err != nil {
-		return
-	}
-	if _, err := fmt.Printf(format, args...); err != nil {
-		c.err = err
-	}
-}
-
 func (c *client) println(args ...interface{}) {
 	if c.err != nil {
 		return
@@ -270,24 +266,6 @@ func (c *client) println(args ...interface{}) {
 	if _, err := fmt.Println(args...); err != nil {
 		c.err = err
 	}
-}
-
-func (c *client) printColored(fc, pc bool, cor string) {
-	if c.err != nil {
-		return
-	}
-	if fc {
-		_, err := green.Print(cor)
-		c.err = err
-		return
-	}
-	if pc {
-		_, err := yellow.Print(cor)
-		c.err = err
-		return
-	}
-	_, err := fmt.Print(cor)
-	c.err = err
 }
 
 func (c *client) printArray(xs []interface{}) {
@@ -328,14 +306,6 @@ func (c *client) printSplitPackages(packages api.SplitPackages) {
 		c.info("%d\t%d\t%d\t%d\n",
 			packages.BookID, pkg.ProjectID, pkg.Owner, len(pkg.PageIDs))
 	}
-}
-
-func toStrings(xs []int) []string {
-	res := make([]string, len(xs))
-	for i, x := range xs {
-		res[i] = fmt.Sprintf("%d", x)
-	}
-	return res
 }
 
 func (c *client) printBook(book *api.Book) {
