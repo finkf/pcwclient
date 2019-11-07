@@ -15,7 +15,7 @@ import (
 var corType string
 
 func init() {
-	printCommand.Flags().StringVarP(&corType, "type", "t",
+	correctCommand.Flags().StringVarP(&corType, "type", "t",
 		"automatic", "set correction type")
 }
 
