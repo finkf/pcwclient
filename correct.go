@@ -80,7 +80,8 @@ func correct(out io.Writer, id, correction string, typ api.CorType) error {
 func correctLine(out io.Writer, bid, pid, lid int, cor api.CorrectionRequest) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
-		return client.PutLine(bid, pid, lid, cor)
+		line, err := client.PutLine(bid, pid, lid, cor)
+		return lineF{line: line, cor: true}, err
 	})
 	return c.done()
 }
@@ -89,9 +90,11 @@ func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor api.CorrectionR
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
 		if len == -1 {
-			return client.PutToken(bid, pid, lid, wid, cor)
+			token, err := client.PutToken(bid, pid, lid, wid, cor)
+			return tokenF{token: token, cor: true}, err
 		}
-		return client.PutTokenLen(bid, pid, lid, wid, len, cor)
+		token, err := client.PutTokenLen(bid, pid, lid, wid, len, cor)
+		return tokenF{token: token, cor: true}, err
 	})
 	return c.done()
 }
