@@ -12,11 +12,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var manualCorrected bool
+var corType string
 
 func init() {
-	printCommand.Flags().BoolVarP(&manualCorrected, "manual", "m",
-		false, "mark correction as manual")
+	printCommand.Flags().StringVarP(&corType, "type", "t",
+		"automatic", "set correction type")
 }
 
 var correctCommand = cobra.Command{
@@ -34,7 +34,7 @@ var correctCommand = cobra.Command{
 
 func doCorrect(c *cobra.Command, args []string) error {
 	for i := 1; i < len(args); i += 2 {
-		if err := correct(os.Stdout, args[i-1], args[i]); err != nil {
+		if err := correct(os.Stdout, args[i-1], args[i], api.CorType(corType)); err != nil {
 			return err
 		}
 	}
@@ -47,21 +47,22 @@ func doCorrect(c *cobra.Command, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("invalid input line: %q", s.Text())
 		}
-		if err := correct(os.Stdout, args[0], strings.Join(args[1:], " ")); err != nil {
+		cor := strings.Join(args[1:], " ")
+		if err := correct(os.Stdout, args[0], cor, api.CorType(corType)); err != nil {
 			return err
 		}
 	}
 	return s.Err()
 }
 
-func correct(out io.Writer, id, correction string) error {
+func correct(out io.Writer, id, correction string, typ api.CorType) error {
 	u, err := strconv.Unquote(`"` + correction + `"`)
 	if err != nil {
 		return err
 	}
 	cor := api.CorrectionRequest{
 		Correction: u,
-		Manually:   manualCorrected,
+		Type:       typ,
 	}
 	var bid, pid, lid, wid, len int
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {

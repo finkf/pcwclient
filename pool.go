@@ -95,7 +95,6 @@ func (r *poolRunner) run(cmds ...string) {
 }
 
 func (r *poolRunner) runCmd(cmdstr string) {
-	log.Debugf("runCmd(%q)", cmdstr)
 	r.client.do(func(client *api.Client) (interface{}, error) {
 		cmd := exec.Command("sh", "-c", cmdstr)
 		cmd.Env = append(os.Environ(),
@@ -125,12 +124,12 @@ func (r *poolRunner) runCmd(cmdstr string) {
 		if err := cmd.Wait(); err != nil {
 			return nil, err
 		}
+		log.Debugf("executed command: %q", cmd)
 		return nil, nil
 	})
 }
 
 func (r *poolRunner) extract() {
-	log.Debugf("extract")
 	r.client.do(func(client *api.Client) (interface{}, error) {
 		if r.baseDir == "" {
 			dir, err := ioutil.TempDir("", "pcwclient_pool_")
@@ -195,11 +194,12 @@ func (r *poolRunner) download() {
 }
 
 func (r *poolRunner) done() error {
-	log.Debugf("done")
 	var err error
-	if !r.persistent {
+	if !r.persistent && r.baseDir != "" {
 		err = os.RemoveAll(r.baseDir)
+		log.Debugf("removed %s", r.baseDir)
 	}
+	log.Debugf("done")
 	if r.client.err != nil {
 		return r.client.err
 	}
