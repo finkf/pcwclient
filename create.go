@@ -29,8 +29,8 @@ func init() {
 		"set book's profiler url")
 	createBookCommand.Flags().IntVarP(&bookYear, "year", "y", 1900,
 		"set book's year")
-	cobra.MarkFlagRequired(createBookCommand.Flags(), "author")
-	cobra.MarkFlagRequired(createBookCommand.Flags(), "title")
+	_ = cobra.MarkFlagRequired(createBookCommand.Flags(), "author")
+	_ = cobra.MarkFlagRequired(createBookCommand.Flags(), "title")
 	createUserCommand.Flags().StringVarP(&userName, "name", "n", "",
 		"set the user's name (required)")
 	createUserCommand.Flags().StringVarP(&userEmail, "email", "e", "",
@@ -41,9 +41,9 @@ func init() {
 		"set the user's institute")
 	createUserCommand.Flags().BoolVarP(&userAdmin, "admin", "a", false,
 		"user has administrator permissions")
-	cobra.MarkFlagRequired(createUserCommand.Flags(), "name")
-	cobra.MarkFlagRequired(createUserCommand.Flags(), "email")
-	cobra.MarkFlagRequired(createUserCommand.Flags(), "password")
+	_ = cobra.MarkFlagRequired(createUserCommand.Flags(), "name")
+	_ = cobra.MarkFlagRequired(createUserCommand.Flags(), "email")
+	_ = cobra.MarkFlagRequired(createUserCommand.Flags(), "password")
 	createPackagesCommand.Flags().BoolVarP(&splitRandom, "random", "r",
 		false, "create random packages")
 }
@@ -151,7 +151,9 @@ func openAsZIP(p string) (io.ReadCloser, error) {
 		return e
 	})
 	w.Close()
-	ioutil.WriteFile("/tmp/pocowebc.zip", buf.Bytes(), 0666)
+	if err := ioutil.WriteFile("/tmp/pocowebc.zip", buf.Bytes(), 0666); err != nil {
+		return nil, err
+	}
 	return ioutil.NopCloser(&buf), err
 }
 
