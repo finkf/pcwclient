@@ -24,7 +24,7 @@ var correctCommand = cobra.Command{
 	Short: "Correct lines or words",
 	Args: func(c *cobra.Command, args []string) error {
 		// zero or 2+ args
-		if len(args)%2 != 0 || len(args) == 0 {
+		if len(args)%2 != 0 {
 			return fmt.Errorf("expected an even number of arugments")
 		}
 		return nil
@@ -56,44 +56,43 @@ func doCorrect(c *cobra.Command, args []string) error {
 }
 
 func correct(out io.Writer, id, correction string, typ api.CorType) error {
-	u, err := strconv.Unquote(`"` + correction + `"`)
+	cor, err := strconv.Unquote(`"` + correction + `"`)
 	if err != nil {
 		return err
-	}
-	cor := api.CorrectionRequest{
-		Correction: u,
-		Type:       typ,
 	}
 	var bid, pid, lid, wid, len int
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 3:
-		return correctLine(os.Stdout, bid, pid, lid, cor)
+		line := api.Line{ProjectID: bid, PageID: pid, LineID: lid}
+		return correctLine(os.Stdout, &line, api.CorType(typ), cor)
 	case 4:
-		return correctWord(os.Stdout, bid, pid, lid, wid, -1, cor)
+		token := api.Token{ProjectID: bid, PageID: pid, LineID: lid, TokenID: wid}
+		return correctWord(os.Stdout, &token, -1, api.CorType(typ), cor)
 	case 5:
-		return correctWord(os.Stdout, bid, pid, lid, wid, len, cor)
+		token := api.Token{ProjectID: bid, PageID: pid, LineID: lid, TokenID: wid}
+		return correctWord(os.Stdout, &token, len, api.CorType(typ), cor)
 	default:
 		return fmt.Errorf("invalid id: %q", id)
 	}
 }
 
-func correctLine(out io.Writer, bid, pid, lid int, cor api.CorrectionRequest) error {
+func correctLine(out io.Writer, line *api.Line, typ api.CorType, cor string) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
-		line, err := client.PutLine(bid, pid, lid, cor)
+		err := client.PutLineX(line, typ, cor)
 		return lineF{line: line, cor: true}, err
 	})
 	return c.done()
 }
 
-func correctWord(out io.Writer, bid, pid, lid, wid, len int, cor api.CorrectionRequest) error {
+func correctWord(out io.Writer, token *api.Token, len int, typ api.CorType, cor string) error {
 	c := newClient(out)
 	c.do(func(client *api.Client) (interface{}, error) {
 		if len == -1 {
-			token, err := client.PutToken(bid, pid, lid, wid, cor)
+			err := client.PutTokenX(token, typ, cor)
 			return tokenF{token: token, cor: true}, err
 		}
-		token, err := client.PutTokenLen(bid, pid, lid, wid, len, cor)
+		err := client.PutTokenLenX(token, len, typ, cor)
 		return tokenF{token: token, cor: true}, err
 	})
 	return c.done()

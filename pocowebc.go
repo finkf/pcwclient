@@ -351,44 +351,9 @@ func (c *client) printExtendedLexicon(el api.ExtendedLexicon) {
 }
 
 func (c *client) printPostCorrection(pc *api.PostCorrection) {
-	classify := func(ts []api.PostCorrectionToken) string {
-		never := true
-		always := true
-		for _, t := range ts {
-			if t.Taken {
-				never = false
-			} else {
-				always = false
-			}
-		}
-		if never {
-			return "never"
-		}
-		if always {
-			return "always"
-		}
-		return "sometimes"
+	for k, v := range pc.Corrections {
+		c.info("%s\t%s\t%s\t%f\t%t\n", k, v.OCR, v.Cor, v.Confidence, v.Taken)
 	}
-	types := make(map[string][]api.PostCorrectionToken)
-	for _, token := range pc.Corrections {
-		types[token.Normalized] = append(types[token.Normalized], token)
-	}
-	always := make(map[string]int)
-	sometimes := make(map[string]int)
-	never := make(map[string]int)
-	for n, ts := range types {
-		switch classify(ts) {
-		case "never":
-			never[n] = len(ts)
-		case "always":
-			always[n] = len(ts)
-		default:
-			sometimes[n] = len(ts)
-		}
-	}
-	c.printFreqMap(pc.BookID, pc.ProjectID, always, "always")
-	c.printFreqMap(pc.BookID, pc.ProjectID, sometimes, "sometimes")
-	c.printFreqMap(pc.BookID, pc.ProjectID, never, "never")
 }
 
 func (c *client) printCharMap(cm api.CharMap) {

@@ -125,7 +125,7 @@ func (f tokenF) format(out io.Writer) error {
 		return nil
 	}
 	id := fmt.Sprintf("%d:%d:%d:%d ",
-		f.token.ProjectID, f.token.PageID, f.token.LineID, f.token.Offset)
+		f.token.ProjectID, f.token.PageID, f.token.LineID, f.token.TokenID)
 	if f.cor {
 		if err := formatSlice(out, id, f.token.Cor, getCol(f.token)); err != nil {
 			return err
@@ -226,7 +226,7 @@ func (f searchF) formatWords(out io.Writer, line *api.Line) error {
 			continue
 		}
 		if _, err := fmt.Fprintf(out, "%d:%d:%d:%d %s\n",
-			t.ProjectID, t.PageID, t.LineID, t.Offset, t.Cor); err != nil {
+			t.ProjectID, t.PageID, t.LineID, t.TokenID, t.Cor); err != nil {
 			return err
 		}
 	}
