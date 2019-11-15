@@ -1,27 +1,98 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
+	"os"
 	"strings"
+	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/finkf/pcwgo/api"
+	log "github.com/sirupsen/logrus"
 )
 
-type formatter interface {
-	format(io.Writer) error
-	underlying() interface{}
-}
+var (
+	formatWords      bool
+	formatOCR        bool
+	noFormatCor      bool
+	formatOnlyManual bool
+	formatJSON       bool
+	formatTemplate   string
+)
 
-func formatSlice(out io.Writer, prefix, str string, col *color.Color) error {
-	if _, err := fmt.Fprint(out, prefix); err != nil {
-		return err
+func must(err error, args ...interface{}) {
+	if err == nil {
+		return
 	}
-	return formatMaybeColored(out, col, str)
+	if len(args) > 0 {
+		err = fmt.Errorf(args[0].(string), append(args[1:], err)...)
+	}
+	log.Fatalf("error: %v", err)
 }
 
-func getCol(t *api.Token) *color.Color {
+type formatter struct {
+	data []interface{}
+}
+
+func (f *formatter) format(data interface{}) {
+	if formatJSON || formatTemplate != "" {
+		f.data = append(f.data, data)
+		return
+	}
+	switch t := data.(type) {
+	case *api.Page:
+		f.formatPage(t)
+	case *api.Line:
+		f.formatLine(t)
+	case *api.Token:
+		f.formatWord(t)
+	case *api.SearchResults:
+		f.formatSearchResults(t)
+	case api.Suggestions:
+		f.formatSuggestions(t)
+	default:
+		log.Fatalf("error: invalid type to print: %T", t)
+	}
+}
+
+func (f *formatter) done() {
+	if !formatJSON && formatTemplate == "" {
+		return
+	}
+	var toPrint interface{}
+	switch len(f.data) {
+	case 0:
+		return
+	case 1:
+		toPrint = f.data[0]
+	default:
+		toPrint = f.data
+	}
+	if formatJSON {
+		f.formatJSON(toPrint)
+	} else {
+		f.formatTemplate(toPrint)
+	}
+}
+
+func (f *formatter) printf(col *color.Color, format string, args ...interface{}) {
+	if col == nil {
+		_, err := fmt.Printf(format, args...)
+		must(err)
+		return
+	}
+	_, err := col.Printf(format, args...)
+	must(err)
+}
+
+var (
+	green  = color.New(color.FgGreen)
+	red    = color.New(color.FgRed)
+	yellow = color.New(color.FgYellow)
+)
+
+func (f *formatter) color(t *api.Token) *color.Color {
 	if t.IsMatch {
 		return red
 	}
@@ -34,231 +105,99 @@ func getCol(t *api.Token) *color.Color {
 	return nil
 }
 
-func formatMaybeColored(out io.Writer, col *color.Color, strs ...interface{}) error {
-	if col == nil {
-		_, err := fmt.Fprint(out, strs...)
-		return err
+func (f *formatter) formatPage(page *api.Page) {
+	for _, line := range page.Lines {
+		f.formatLine(&line)
 	}
-	_, err := col.Fprint(out, strs...)
-	return err
 }
 
-type lineF struct {
-	line                  *api.Line
-	cor, ocr, skip, words bool
-}
-
-func (f lineF) underlying() interface{} {
-	return f.line
-}
-
-func (f lineF) format(out io.Writer) error {
-	if f.words {
-		return f.formatWords(out)
+func (f *formatter) formatLine(line *api.Line) {
+	if formatOnlyManual && !line.IsManuallyCorrected {
+		return
 	}
-	return f.formatLine(out)
-}
-
-func (f lineF) formatLine(out io.Writer) error {
-	if f.skip && !f.line.IsManuallyCorrected {
-		return nil
+	if formatWords {
+		f.formatLineWords(line)
+		return
 	}
-	if f.cor {
-		if _, err := fmt.Fprintf(out, "%d:%d:%d",
-			f.line.ProjectID, f.line.PageID, f.line.LineID); err != nil {
-			return err
+	if !noFormatCor {
+		f.printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
+		for _, w := range line.Tokens {
+			f.printf(nil, " ")
+			f.printf(f.color(&w), w.Cor)
 		}
-		for _, w := range f.line.Tokens {
-			if err := formatSlice(out, " ", w.Cor, getCol(&w)); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintln(out); err != nil {
-			return err
-		}
-
+		f.printf(nil, "\n")
 	}
-	if f.ocr {
-		if _, err := fmt.Fprintf(out, "%d:%d:%d",
-			f.line.ProjectID, f.line.PageID, f.line.LineID); err != nil {
-			return err
+	if formatOCR {
+		f.printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
+		for _, w := range line.Tokens {
+			f.printf(nil, " ")
+			f.printf(nil, w.OCR)
 		}
-		for _, w := range f.line.Tokens {
-			if err := formatSlice(out, " ", w.OCR, nil); err != nil {
-				return err
-			}
-		}
-		if _, err := fmt.Fprintln(out); err != nil {
-			return err
-		}
-
+		f.printf(nil, "\n")
 	}
-	return nil
 }
 
-func (f lineF) formatWords(out io.Writer) error {
-	tf := tokenF{
-		cor:  f.cor,
-		ocr:  f.ocr,
-		skip: f.skip,
+func (f *formatter) formatLineWords(line *api.Line) {
+	if formatOnlyManual && !line.IsManuallyCorrected {
+		return
 	}
-	for _, w := range f.line.Tokens {
-		tf.token = &w
-		if err := tf.format(out); err != nil {
-			return err
-		}
+	for _, w := range line.Tokens {
+		f.formatWord(&w)
 	}
-	return nil
 }
 
-type tokenF struct {
-	token          *api.Token
-	cor, ocr, skip bool
-}
-
-func (f tokenF) underlying() interface{} {
-	return f.token
-}
-
-func (f tokenF) format(out io.Writer) error {
-	if f.skip && !f.token.IsManuallyCorrected {
-		return nil
+func (f *formatter) formatWord(w *api.Token) {
+	if formatOnlyManual && !w.IsManuallyCorrected {
+		return
 	}
-	id := fmt.Sprintf("%d:%d:%d:%d ",
-		f.token.ProjectID, f.token.PageID, f.token.LineID, f.token.TokenID)
-	if f.cor {
-		if err := formatSlice(out, id, f.token.Cor, getCol(f.token)); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(out); err != nil {
-			return err
-		}
+	if !noFormatCor {
+		f.printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
+		f.printf(f.color(w), w.Cor)
+		f.printf(nil, "\n")
 	}
-	if f.ocr {
-		if err := formatSlice(out, id, f.token.OCR, nil); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(out); err != nil {
-			return err
-		}
+	if formatOCR {
+		f.printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
+		f.printf(nil, w.Cor)
+		f.printf(nil, "\n")
 	}
-	return nil
 }
 
-type pageF struct {
-	page                  *api.Page
-	cor, ocr, skip, words bool
-}
-
-func (f pageF) underlying() interface{} {
-	return f.page
-}
-
-func (f pageF) format(out io.Writer) error {
-	lf := lineF{
-		cor:   f.cor,
-		ocr:   f.ocr,
-		skip:  f.skip,
-		words: f.words,
-	}
-	for _, l := range f.page.Lines {
-		lf.line = &l
-		if err := lf.format(out); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type searchF struct {
-	results *api.SearchResults
-	words   bool
-}
-
-func (f searchF) underlying() interface{} {
-	return f.results
-}
-
-func (f searchF) format(out io.Writer) error {
-	cb := f.formatLine
-	if f.words {
-		cb = f.formatWords
-	}
-	for _, m := range f.results.Matches {
+func (f *formatter) formatSearchResults(res *api.SearchResults) {
+	for _, m := range res.Matches {
 		for _, line := range m.Lines {
-			if err := cb(out, &line); err != nil {
-				return err
-			}
+			f.formatLine(&line)
 		}
 	}
-	return nil
 }
 
-func (f searchF) formatLine(out io.Writer, line *api.Line) error {
-	if _, err := fmt.Fprintf(out, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID); err != nil {
-		return err
-	}
-	var epos int
-	for _, t := range line.Tokens {
-		if epos == 0 || t.Offset != epos {
-			if _, err := fmt.Fprint(out, " "); err != nil {
-				return err
-			}
-			if err := formatMaybeColored(out, getCol(&t), t.Cor); err != nil {
-				return err
-			}
-			corlen := len([]rune(t.Cor))
-			ocrlen := len([]rune(t.OCR))
-			maxlen := corlen
-			if maxlen < ocrlen {
-				maxlen = ocrlen
-			}
-			epos = t.Offset + maxlen
-		}
-	}
-	_, err := fmt.Fprintln(out)
-	return err
-}
-
-func (f searchF) formatWords(out io.Writer, line *api.Line) error {
-	for _, t := range line.Tokens {
-		if !t.IsMatch {
-			continue
-		}
-		if _, err := fmt.Fprintf(out, "%d:%d:%d:%d %s\n",
-			t.ProjectID, t.PageID, t.LineID, t.TokenID, t.Cor); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type suggestionsF struct {
-	suggestions api.Suggestions
-}
-
-func (f suggestionsF) underlying() interface{} {
-	return f.suggestions
-}
-
-func (f suggestionsF) format(out io.Writer) error {
-	for _, xs := range f.suggestions.Suggestions {
-		for _, s := range xs {
-			_, err := fmt.Fprintf(out, "%d %s %s %s %s %s %s %d %f %t\n",
-				f.suggestions.ProjectID, s.Token, s.Suggestion, s.Modern,
-				formatPatterns(s.HistPatterns), formatPatterns(s.OCRPatterns),
+func (f *formatter) formatSuggestions(suggs api.Suggestions) {
+	for _, sugg := range suggs.Suggestions {
+		for _, s := range sugg {
+			f.printf(nil, "%d %s %s %s %s %s %s %d %f %t\n",
+				suggs.ProjectID, s.Token, s.Suggestion, s.Modern,
+				patterns(s.HistPatterns), patterns(s.OCRPatterns),
 				s.Dict, s.Distance, s.Weight, s.Top)
-			if err != nil {
-				return err
-			}
 		}
 	}
+}
+
+func (f *formatter) formatJSON(data interface{}) {
+	must(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
+}
+
+func (f *formatter) formatTemplate(data interface{}) error {
+	t, err := template.New("pocwebc").Parse(strings.Replace(formatTemplate, "\\n", "\n", -1))
+	must(err, "invalid format string: %v")
+	err = t.Execute(os.Stdout, data)
+	must(err, "cannot format template: %v")
 	return nil
 }
 
-func formatPatterns(patterns []string) string {
-	if len(patterns) == 0 {
+type patterns []string
+
+func (ps patterns) String() string {
+	if len(ps) == 0 {
 		return "::"
 	}
-	return strings.Join(patterns, ",")
+	return strings.Join(ps, ",")
 }

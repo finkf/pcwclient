@@ -10,7 +10,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/finkf/gofiler"
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
@@ -19,15 +18,10 @@ import (
 
 // various command line flags
 var (
-	debug        = false
-	jsonOutput   = false
-	skipVerify   = false
-	formatString = ""
-	authToken    = ""
-	pocowebURL   = ""
-	green        = color.New(color.FgGreen)
-	red          = color.New(color.FgRed)
-	yellow       = color.New(color.FgYellow)
+	debug      = false
+	skipVerify = false
+	authToken  = ""
+	pocowebURL = ""
 )
 
 var mainCommand = &cobra.Command{
@@ -80,7 +74,7 @@ func init() {
 
 	mainCommand.SilenceUsage = true
 	mainCommand.SilenceErrors = true
-	mainCommand.PersistentFlags().BoolVarP(&jsonOutput, "json", "J", false,
+	mainCommand.PersistentFlags().BoolVarP(&formatJSON, "json", "J", false,
 		"output raw json")
 	mainCommand.PersistentFlags().BoolVarP(&skipVerify, "skip-verify", "S", false,
 		"ignore invalid ssl certificates")
@@ -88,7 +82,7 @@ func init() {
 		"enable debug output")
 	mainCommand.PersistentFlags().StringVarP(&pocowebURL, "url", "U",
 		getURL(), "set pocoweb url (env: PCWCLIENT_URL)")
-	mainCommand.PersistentFlags().StringVarP(&formatString, "format", "F",
+	mainCommand.PersistentFlags().StringVarP(&formatTemplate, "format", "F",
 		"", "set output format")
 	mainCommand.PersistentFlags().StringVarP(&authToken, "auth", "A",
 		getAuth(), "set auth token (env: PCWCLIENT_AUTH)")
@@ -155,11 +149,11 @@ func (c *client) done() error {
 	if c.err != nil {
 		return c.err
 	}
-	if jsonOutput {
+	if formatJSON {
 		return c.printJSON()
 	}
-	if formatString != "" {
-		return c.printTemplate(formatString)
+	if formatTemplate != "" {
+		return c.printTemplate(formatTemplate)
 	}
 	return nil
 }
@@ -169,13 +163,8 @@ func (c *client) print(val interface{}) {
 		return
 	}
 	// cache printout data for json or format output
-	if jsonOutput || formatString != "" {
-		switch t := val.(type) {
-		case formatter:
-			c.data = append(c.data, t.underlying())
-		default:
-			c.data = append(c.data, val)
-		}
+	if formatJSON || formatTemplate != "" {
+		c.data = append(c.data, val)
 		return
 	}
 	if val != nil {
@@ -189,8 +178,6 @@ func (c *client) printVal(val interface{}) {
 	}
 	// just print the given value
 	switch t := val.(type) {
-	case formatter:
-		c.err = t.format(os.Stdout)
 	case []interface{}:
 		c.printArray(t)
 	case api.Session:

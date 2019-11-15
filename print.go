@@ -8,21 +8,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	printWords bool
-	printOCR   bool
-	printCor   bool
-	skipNonCor bool
-)
-
 func init() {
-	printCommand.Flags().BoolVarP(&printWords, "words", "w", false,
+	printCommand.Flags().BoolVarP(&formatWords, "words", "w", false,
 		"print words not lines")
-	printCommand.Flags().BoolVarP(&printOCR, "ocr", "o", false,
+	printCommand.Flags().BoolVarP(&formatOCR, "ocr", "o", false,
 		"print ocr lines instead of cor")
-	printCommand.Flags().BoolVarP(&printCor, "cor", "c", false,
-		"print corrected lines (set to print ocr and cor lines)")
-	printCommand.Flags().BoolVarP(&skipNonCor, "skip", "s", false,
+	printCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
+		"do not print corrected lines")
+	printCommand.Flags().BoolVarP(&formatOnlyManual, "skip", "s", false,
 		"skip non corrected lines/words")
 }
 
@@ -34,9 +27,6 @@ var printCommand = cobra.Command{
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
-	if !printOCR && !printCor {
-		printCor = true
-	}
 	c := newClient(os.Stdout)
 	for _, id := range args {
 		var bid, pid, lid, wid, len int
@@ -61,6 +51,8 @@ func printIDs(_ *cobra.Command, args []string) error {
 func getPages(c *client, bid int) {
 	pageid := 0
 	done := false
+	var f formatter
+	defer f.done()
 	for !done {
 		c.do(func(client *api.Client) (interface{}, error) {
 			p, err := getPageImpl(client, bid, pageid)
@@ -72,18 +64,15 @@ func getPages(c *client, bid int) {
 				done = true
 			}
 			pageid = p.NextPageID
-			return pageF{
-				page:  p,
-				cor:   printCor,
-				ocr:   printOCR,
-				words: printWords,
-				skip:  skipNonCor,
-			}, nil
+			f.format(p)
+			return nil, nil
 		})
 	}
 }
 
 func getPage(c *client, bid, pid int) {
+	var f formatter
+	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		var p *api.Page
 		var err error
@@ -95,13 +84,9 @@ func getPage(c *client, bid, pid int) {
 		default:
 			p, err = client.GetPage(bid, pid)
 		}
-		return pageF{
-			page:  p,
-			cor:   printCor,
-			ocr:   printOCR,
-			words: printWords,
-			skip:  skipNonCor,
-		}, err
+		must(err, "cannot get page: %v")
+		f.format(p)
+		return nil, nil
 	})
 }
 
@@ -117,19 +102,19 @@ func getPageImpl(client *api.Client, bid, pid int) (*api.Page, error) {
 }
 
 func getLine(c *client, bid, pid, lid int) {
+	var f formatter
+	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		l, err := c.client.GetLine(bid, pid, lid)
-		return lineF{
-			line:  l,
-			cor:   printCor,
-			ocr:   printOCR,
-			words: printWords,
-			skip:  skipNonCor,
-		}, err
+		must(err, "cannot get line: %v")
+		f.format(l)
+		return nil, nil
 	})
 }
 
 func getWord(c *client, bid, pid, lid, wid, len int) {
+	var f formatter
+	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		var err error
 		var t *api.Token
@@ -139,11 +124,8 @@ func getWord(c *client, bid, pid, lid, wid, len int) {
 		default:
 			t, err = c.client.GetTokenLen(bid, pid, lid, wid, len)
 		}
-		return tokenF{
-			token: t,
-			cor:   printCor,
-			ocr:   printOCR,
-			skip:  skipNonCor,
-		}, err
+		must(err, "cannot get word: %v")
+		f.format(t)
+		return nil, nil
 	})
 }

@@ -13,9 +13,9 @@ import (
 )
 
 func init() {
-	searchCommand.Flags().StringVarP(&searchType, "pattern", "e",
+	searchCommand.Flags().StringVarP(&searchType, "type", "t",
 		"token", "set search type (token|pattern|ac)")
-	searchCommand.Flags().BoolVarP(&printWords, "words", "w",
+	searchCommand.Flags().BoolVarP(&formatWords, "words", "w",
 		false, "print out matched words")
 	searchCommand.Flags().BoolVarP(&searchAll, "all", "a",
 		false, "search for all matches")
@@ -177,6 +177,8 @@ func runSearch(cmd *cobra.Command, args []string) error {
 func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 	c := newClient(out)
 	var done bool
+	var f formatter
+	defer f.done()
 	for !done && c.err == nil {
 		c.do(func(client *api.Client) (interface{}, error) {
 			s := api.Search{
@@ -187,9 +189,8 @@ func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 				Type:   typ,
 			}
 			ret, err := s.Search(id, qs...)
-			if err != nil {
-				return nil, err
-			}
+			must(err, "cannot search: %v")
+			f.format(ret)
 			if len(ret.Matches) == 0 {
 				done = true
 				return nil, nil
@@ -197,10 +198,7 @@ func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 			if !searchAll {
 				done = true
 			}
-			return searchF{
-				results: ret,
-				words:   printWords,
-			}, err
+			return nil, nil
 		})
 	}
 	return c.done()

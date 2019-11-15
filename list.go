@@ -169,9 +169,13 @@ func listAllSuggestions(out io.Writer, id int) error {
 
 func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
 	c := newClient(out)
+	var f formatter
+	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		s, err := c.client.QueryProfile(id, q, qs...)
-		return suggestionsF{s}, err
+		must(err, "cannot query profile: %v")
+		f.format(s)
+		return nil, nil
 	})
 	return c.done()
 }
