@@ -165,7 +165,20 @@ func (f *formatter) formatWord(w *api.Token) {
 func (f *formatter) formatSearchResults(res *api.SearchResults) {
 	for _, m := range res.Matches {
 		for _, line := range m.Lines {
-			f.formatLine(&line)
+			if formatWords {
+				for _, w := range line.Tokens {
+					// skip non matched tokens
+					if !w.IsMatch {
+						continue
+					}
+					// It does not make sense to mark each matched token in red.
+					// Just print the normal token with its normal color.
+					w.IsMatch = false
+					f.formatWord(&w)
+				}
+			} else {
+				f.formatLine(&line)
+			}
 		}
 	}
 }

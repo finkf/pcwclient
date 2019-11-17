@@ -15,6 +15,10 @@ import (
 func init() {
 	searchCommand.Flags().StringVarP(&searchType, "type", "t",
 		"token", "set search type (token|pattern|ac)")
+	searchCommand.Flags().BoolVarP(&formatOCR, "ocr", "o", false,
+		"print ocr lines")
+	searchCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
+		"do not print corrected lines")
 	searchCommand.Flags().BoolVarP(&formatWords, "words", "w",
 		false, "print out matched words")
 	searchCommand.Flags().BoolVarP(&searchAll, "all", "a",
