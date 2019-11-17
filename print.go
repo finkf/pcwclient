@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 
@@ -22,30 +23,45 @@ func init() {
 var printCommand = cobra.Command{
 	Use:   "print IDs...",
 	Short: "print books, pages, lines and words",
-	Args:  cobra.MinimumNArgs(1),
 	RunE:  printIDs,
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
 	c := newClient(os.Stdout)
 	for _, id := range args {
-		var bid, pid, lid, wid, len int
-		switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
-		case 5:
-			getWord(c, bid, pid, lid, wid, len)
-		case 4:
-			getWord(c, bid, pid, lid, wid, -1)
-		case 3:
-			getLine(c, bid, pid, lid)
-		case 2:
-			getPage(c, bid, pid)
-		case 1:
-			getPages(c, bid)
-		default:
-			return fmt.Errorf("invalid id: %s", id)
+		if err := doPrintID(c, id); err != nil {
+			return err
 		}
 	}
-	return c.done()
+	if len(args) > 0 {
+		return nil
+	}
+	s := bufio.NewScanner(os.Stdin)
+	for s.Scan() {
+		if err := doPrintID(c, s.Text()); err != nil {
+			return err
+		}
+	}
+	return s.Err()
+}
+
+func doPrintID(c *client, id string) error {
+	var bid, pid, lid, wid, len int
+	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
+	case 5:
+		getWord(c, bid, pid, lid, wid, len)
+	case 4:
+		getWord(c, bid, pid, lid, wid, -1)
+	case 3:
+		getLine(c, bid, pid, lid)
+	case 2:
+		getPage(c, bid, pid)
+	case 1:
+		getPages(c, bid)
+	default:
+		return fmt.Errorf("invalid id: %s", id)
+	}
+	return nil
 }
 
 func getPages(c *client, bid int) {
