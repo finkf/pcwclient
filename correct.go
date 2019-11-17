@@ -34,7 +34,8 @@ var correctCommand = cobra.Command{
 
 func doCorrect(c *cobra.Command, args []string) error {
 	for i := 1; i < len(args); i += 2 {
-		if err := correct(os.Stdout, args[i-1], args[i], api.CorType(corType)); err != nil {
+		if err := correct(os.Stdout, args[i-1], args[i],
+			api.CorType(corType)); err != nil {
 			return err
 		}
 	}
