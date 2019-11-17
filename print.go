@@ -12,7 +12,7 @@ func init() {
 	printCommand.Flags().BoolVarP(&formatWords, "words", "w", false,
 		"print words not lines")
 	printCommand.Flags().BoolVarP(&formatOCR, "ocr", "o", false,
-		"print ocr lines instead of cor")
+		"print ocr lines")
 	printCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
 		"do not print corrected lines")
 	printCommand.Flags().BoolVarP(&formatOnlyManual, "skip", "s", false,
