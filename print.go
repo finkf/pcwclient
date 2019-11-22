@@ -16,8 +16,8 @@ func init() {
 		"print ocr lines")
 	printCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
 		"do not print corrected lines")
-	printCommand.Flags().BoolVarP(&formatOnlyManual, "skip", "s", false,
-		"skip non corrected lines/words")
+	printCommand.Flags().BoolVarP(&formatOnlyManual, "manual", "m", false,
+		"only print manual corrected lines/words")
 }
 
 var printCommand = cobra.Command{
