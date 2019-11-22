@@ -2,10 +2,10 @@ package main
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 
 	"github.com/finkf/pcwgo/api"
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,7 @@ var printCommand = cobra.Command{
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
-	c := newClient(os.Stdout)
+	c := api.Authenticate(getURL(), getAuth(), skipVerify)
 	for _, id := range args {
 		if err := doPrintID(c, id); err != nil {
 			return err
@@ -45,7 +45,7 @@ func printIDs(_ *cobra.Command, args []string) error {
 	return s.Err()
 }
 
-func doPrintID(c *client, id string) error {
+func doPrintID(c *api.Client, id string) error {
 	var bid, pid, lid, wid, len int
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 5:
@@ -59,81 +59,65 @@ func doPrintID(c *client, id string) error {
 	case 1:
 		getPages(c, bid)
 	default:
-		return fmt.Errorf("invalid id: %s", id)
+		log.Fatalf("invalid id: %s", id)
 	}
 	return nil
 }
 
-func getPages(c *client, bid int) {
+func getPages(c *api.Client, bid int) {
 	pageid := 0
-	done := false
-	for !done {
-		c.do(func(client *api.Client) (interface{}, error) {
-			p, err := getPageImpl(client, bid, pageid)
-			if err != nil {
-				done = true
-				return nil, err
-			}
-			if p.PageID == p.NextPageID {
-				done = true
-			}
-			pageid = p.NextPageID
-			format(p)
-			return nil, nil
-		})
+	for {
+		p, err := getPageImpl(c, bid, pageid)
+		handle(err, "cannot get page %d: %v", pageid)
+		if p.PageID == p.NextPageID {
+			break
+		}
+		pageid = p.NextPageID
+		format(p)
 	}
 }
 
-func getPage(c *client, bid, pid int) {
-	c.do(func(client *api.Client) (interface{}, error) {
-		var p *api.Page
-		var err error
-		switch pid {
-		case 0:
-			p, err = client.GetFirstPage(bid)
-		case -1:
-			p, err = client.GetLastPage(bid)
-		default:
-			p, err = client.GetPage(bid, pid)
-		}
-		handle(err, "cannot get page: %v")
-		format(p)
-		return nil, nil
-	})
-}
-
-func getPageImpl(client *api.Client, bid, pid int) (*api.Page, error) {
+func getPage(c *api.Client, bid, pid int) {
+	var p *api.Page
+	var err error
 	switch pid {
 	case 0:
-		return client.GetFirstPage(bid)
+		p, err = c.GetFirstPage(bid)
 	case -1:
-		return client.GetLastPage(bid)
+		p, err = c.GetLastPage(bid)
 	default:
-		return client.GetPage(bid, pid)
+		p, err = c.GetPage(bid, pid)
+	}
+	handle(err, "cannot get page: %v")
+	format(p)
+}
+
+func getPageImpl(c *api.Client, bid, pid int) (*api.Page, error) {
+	switch pid {
+	case 0:
+		return c.GetFirstPage(bid)
+	case -1:
+		return c.GetLastPage(bid)
+	default:
+		return c.GetPage(bid, pid)
 	}
 }
 
-func getLine(c *client, bid, pid, lid int) {
-	c.do(func(client *api.Client) (interface{}, error) {
-		l, err := c.client.GetLine(bid, pid, lid)
-		handle(err, "cannot get line: %v")
-		format(l)
-		return nil, nil
-	})
+func getLine(c *api.Client, bid, pid, lid int) {
+	l, err := c.GetLine(bid, pid, lid)
+	handle(err, "cannot get line: %v")
+	format(l)
 }
 
-func getWord(c *client, bid, pid, lid, wid, len int) {
-	c.do(func(client *api.Client) (interface{}, error) {
-		var err error
-		var t *api.Token
-		switch len {
-		case -1:
-			t, err = c.client.GetToken(bid, pid, lid, wid)
-		default:
-			t, err = c.client.GetTokenLen(bid, pid, lid, wid, len)
-		}
-		handle(err, "cannot get word: %v")
-		format(t)
-		return nil, nil
-	})
+func getWord(c *api.Client, bid, pid, lid, wid, len int) {
+	var err error
+	var t *api.Token
+	switch len {
+	case -1:
+		t, err = c.GetToken(bid, pid, lid, wid)
+	default:
+		t, err = c.GetTokenLen(bid, pid, lid, wid, len)
+	}
+	handle(err, "cannot get word: %v")
+	format(t)
 }
