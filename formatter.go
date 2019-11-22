@@ -31,52 +31,27 @@ func handle(err error, args ...interface{}) {
 	log.Fatalf("error: %v", err)
 }
 
-type formatter struct {
-	data []interface{}
-}
-
-func (f *formatter) format(data interface{}) {
-	if formatJSON || formatTemplate != "" {
-		f.data = append(f.data, data)
+func format(data interface{}) {
+	if formatMaybeSpecial(data) {
 		return
 	}
 	switch t := data.(type) {
 	case *api.Page:
-		f.formatPage(t)
+		formatPage(t)
 	case *api.Line:
-		f.formatLine(t)
+		formatLine(t)
 	case *api.Token:
-		f.formatWord(t)
+		formatWord(t)
 	case *api.SearchResults:
-		f.formatSearchResults(t)
+		formatSearchResults(t)
 	case api.Suggestions:
-		f.formatSuggestions(t)
+		formatSuggestions(t)
 	default:
 		log.Fatalf("error: invalid type to print: %T", t)
 	}
 }
 
-func (f *formatter) done() {
-	if !formatJSON && formatTemplate == "" {
-		return
-	}
-	var toPrint interface{}
-	switch len(f.data) {
-	case 0:
-		return
-	case 1:
-		toPrint = f.data[0]
-	default:
-		toPrint = f.data
-	}
-	if formatJSON {
-		f.formatJSON(toPrint)
-	} else {
-		f.formatTemplate(toPrint)
-	}
-}
-
-func (f *formatter) printf(col *color.Color, format string, args ...interface{}) {
+func printf(col *color.Color, format string, args ...interface{}) {
 	if col == nil {
 		_, err := fmt.Printf(format, args...)
 		handle(err)
@@ -92,7 +67,7 @@ var (
 	yellow = color.New(color.FgYellow)
 )
 
-func (f *formatter) color(t *api.Token) *color.Color {
+func colorForToken(t *api.Token) *color.Color {
 	if t.IsMatch {
 		return red
 	}
@@ -105,64 +80,64 @@ func (f *formatter) color(t *api.Token) *color.Color {
 	return nil
 }
 
-func (f *formatter) formatPage(page *api.Page) {
+func formatPage(page *api.Page) {
 	for _, line := range page.Lines {
-		f.formatLine(&line)
+		formatLine(&line)
 	}
 }
 
-func (f *formatter) formatLine(line *api.Line) {
+func formatLine(line *api.Line) {
 	if formatOnlyManual && !line.IsManuallyCorrected {
 		return
 	}
 	if formatWords {
-		f.formatLineWords(line)
+		formatLineWords(line)
 		return
 	}
 	if !noFormatCor {
-		f.printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
+		printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
 		for _, w := range line.Tokens {
-			f.printf(nil, " ")
-			f.printf(f.color(&w), w.Cor)
+			printf(nil, " ")
+			printf(colorForToken(&w), w.Cor)
 		}
-		f.printf(nil, "\n")
+		printf(nil, "\n")
 	}
 	if formatOCR {
-		f.printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
+		printf(nil, "%d:%d:%d", line.ProjectID, line.PageID, line.LineID)
 		for _, w := range line.Tokens {
-			f.printf(nil, " ")
-			f.printf(nil, w.OCR)
+			printf(nil, " ")
+			printf(nil, w.OCR)
 		}
-		f.printf(nil, "\n")
+		printf(nil, "\n")
 	}
 }
 
-func (f *formatter) formatLineWords(line *api.Line) {
+func formatLineWords(line *api.Line) {
 	if formatOnlyManual && !line.IsManuallyCorrected {
 		return
 	}
 	for _, w := range line.Tokens {
-		f.formatWord(&w)
+		formatWord(&w)
 	}
 }
 
-func (f *formatter) formatWord(w *api.Token) {
+func formatWord(w *api.Token) {
 	if formatOnlyManual && !w.IsManuallyCorrected {
 		return
 	}
 	if !noFormatCor {
-		f.printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
-		f.printf(f.color(w), w.Cor)
-		f.printf(nil, "\n")
+		printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
+		printf(colorForToken(w), w.Cor)
+		printf(nil, "\n")
 	}
 	if formatOCR {
-		f.printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
-		f.printf(nil, w.Cor)
-		f.printf(nil, "\n")
+		printf(nil, "%d:%d:%d:%d ", w.ProjectID, w.PageID, w.LineID, w.TokenID)
+		printf(nil, w.Cor)
+		printf(nil, "\n")
 	}
 }
 
-func (f *formatter) formatSearchResults(res *api.SearchResults) {
+func formatSearchResults(res *api.SearchResults) {
 	for _, m := range res.Matches {
 		for _, line := range m.Lines {
 			if formatWords {
@@ -174,19 +149,19 @@ func (f *formatter) formatSearchResults(res *api.SearchResults) {
 					// It does not make sense to mark each matched token in red.
 					// Just print the normal token with its normal color.
 					w.IsMatch = false
-					f.formatWord(&w)
+					formatWord(&w)
 				}
 			} else {
-				f.formatLine(&line)
+				formatLine(&line)
 			}
 		}
 	}
 }
 
-func (f *formatter) formatSuggestions(suggs api.Suggestions) {
+func formatSuggestions(suggs api.Suggestions) {
 	for _, sugg := range suggs.Suggestions {
 		for _, s := range sugg {
-			f.printf(nil, "%d %s %s %s %s %s %s %d %f %t\n",
+			printf(nil, "%d %s %s %s %s %s %s %d %f %t\n",
 				suggs.ProjectID, s.Token, s.Suggestion, s.Modern,
 				patterns(s.HistPatterns), patterns(s.OCRPatterns),
 				s.Dict, s.Distance, s.Weight, s.Top)
@@ -194,16 +169,33 @@ func (f *formatter) formatSuggestions(suggs api.Suggestions) {
 	}
 }
 
-func (f *formatter) formatJSON(data interface{}) {
-	handle(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
+func formatMaybeSpecial(data interface{}) bool {
+	if formatMaybeJSON(data) {
+		return true
+	}
+	if formatMaybeTemplate(data) {
+		return true
+	}
+	return false
 }
 
-func (f *formatter) formatTemplate(data interface{}) error {
+func formatMaybeJSON(data interface{}) bool {
+	if !formatJSON {
+		return false
+	}
+	handle(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
+	return true
+}
+
+func formatMaybeTemplate(data interface{}) bool {
+	if formatTemplate == "" {
+		return false
+	}
 	t, err := template.New("pocwebc").Parse(strings.Replace(formatTemplate, "\\n", "\n", -1))
 	handle(err, "invalid format string: %v")
 	err = t.Execute(os.Stdout, data)
 	handle(err, "cannot format template: %v")
-	return nil
+	return true
 }
 
 type patterns []string

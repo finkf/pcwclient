@@ -192,8 +192,6 @@ func hasAnyMatch(res *api.SearchResults) bool {
 func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 	c := newClient(out)
 	var done bool
-	var f formatter
-	defer f.done()
 	searcher := api.Searcher{
 		Skip: searchSkip,
 		Max:  searchMax,
@@ -205,7 +203,7 @@ func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 			searcher.Client = client
 			ret, err := searcher.Search(id, qs...)
 			handle(err, "cannot search: %v", err)
-			f.format(ret)
+			format(ret)
 			if !hasAnyMatch(ret) {
 				done = true
 				return nil, nil

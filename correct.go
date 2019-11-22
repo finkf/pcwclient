@@ -79,10 +79,9 @@ func correct(out io.Writer, id, correction string, typ api.CorType) error {
 
 func correctLine(out io.Writer, line *api.Line, typ api.CorType, cor string) error {
 	c := newClient(out)
-	var f formatter
 	c.do(func(client *api.Client) (interface{}, error) {
 		handle(client.PutLineX(line, typ, cor), "cannot correct line: %v")
-		f.format(line)
+		format(line)
 		return nil, nil
 	})
 	return c.done()
@@ -90,15 +89,14 @@ func correctLine(out io.Writer, line *api.Line, typ api.CorType, cor string) err
 
 func correctWord(out io.Writer, token *api.Token, len int, typ api.CorType, cor string) error {
 	c := newClient(out)
-	var f formatter
 	c.do(func(client *api.Client) (interface{}, error) {
 		if len == -1 {
 			handle(client.PutTokenX(token, typ, cor), "cannot correct token: %v")
-			f.format(token)
+			format(token)
 			return nil, nil
 		}
 		handle(client.PutTokenLenX(token, len, typ, cor), "cannot correct token: %v")
-		f.format(token)
+		format(token)
 		return nil, nil
 	})
 	return c.done()

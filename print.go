@@ -67,8 +67,6 @@ func doPrintID(c *client, id string) error {
 func getPages(c *client, bid int) {
 	pageid := 0
 	done := false
-	var f formatter
-	defer f.done()
 	for !done {
 		c.do(func(client *api.Client) (interface{}, error) {
 			p, err := getPageImpl(client, bid, pageid)
@@ -80,15 +78,13 @@ func getPages(c *client, bid int) {
 				done = true
 			}
 			pageid = p.NextPageID
-			f.format(p)
+			format(p)
 			return nil, nil
 		})
 	}
 }
 
 func getPage(c *client, bid, pid int) {
-	var f formatter
-	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		var p *api.Page
 		var err error
@@ -101,7 +97,7 @@ func getPage(c *client, bid, pid int) {
 			p, err = client.GetPage(bid, pid)
 		}
 		handle(err, "cannot get page: %v")
-		f.format(p)
+		format(p)
 		return nil, nil
 	})
 }
@@ -118,19 +114,15 @@ func getPageImpl(client *api.Client, bid, pid int) (*api.Page, error) {
 }
 
 func getLine(c *client, bid, pid, lid int) {
-	var f formatter
-	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		l, err := c.client.GetLine(bid, pid, lid)
 		handle(err, "cannot get line: %v")
-		f.format(l)
+		format(l)
 		return nil, nil
 	})
 }
 
 func getWord(c *client, bid, pid, lid, wid, len int) {
-	var f formatter
-	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		var err error
 		var t *api.Token
@@ -141,7 +133,7 @@ func getWord(c *client, bid, pid, lid, wid, len int) {
 			t, err = c.client.GetTokenLen(bid, pid, lid, wid, len)
 		}
 		handle(err, "cannot get word: %v")
-		f.format(t)
+		format(t)
 		return nil, nil
 	})
 }
