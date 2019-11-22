@@ -173,7 +173,7 @@ func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
 	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		s, err := c.client.QueryProfile(id, q, qs...)
-		must(err, "cannot query profile: %v")
+		handle(err, "cannot query profile: %v")
 		f.format(s)
 		return nil, nil
 	})

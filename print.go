@@ -100,7 +100,7 @@ func getPage(c *client, bid, pid int) {
 		default:
 			p, err = client.GetPage(bid, pid)
 		}
-		must(err, "cannot get page: %v")
+		handle(err, "cannot get page: %v")
 		f.format(p)
 		return nil, nil
 	})
@@ -122,7 +122,7 @@ func getLine(c *client, bid, pid, lid int) {
 	defer f.done()
 	c.do(func(client *api.Client) (interface{}, error) {
 		l, err := c.client.GetLine(bid, pid, lid)
-		must(err, "cannot get line: %v")
+		handle(err, "cannot get line: %v")
 		f.format(l)
 		return nil, nil
 	})
@@ -140,7 +140,7 @@ func getWord(c *client, bid, pid, lid, wid, len int) {
 		default:
 			t, err = c.client.GetTokenLen(bid, pid, lid, wid, len)
 		}
-		must(err, "cannot get word: %v")
+		handle(err, "cannot get word: %v")
 		f.format(t)
 		return nil, nil
 	})

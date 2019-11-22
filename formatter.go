@@ -21,7 +21,7 @@ var (
 	formatTemplate   string
 )
 
-func must(err error, args ...interface{}) {
+func handle(err error, args ...interface{}) {
 	if err == nil {
 		return
 	}
@@ -79,11 +79,11 @@ func (f *formatter) done() {
 func (f *formatter) printf(col *color.Color, format string, args ...interface{}) {
 	if col == nil {
 		_, err := fmt.Printf(format, args...)
-		must(err)
+		handle(err)
 		return
 	}
 	_, err := col.Printf(format, args...)
-	must(err)
+	handle(err)
 }
 
 var (
@@ -195,14 +195,14 @@ func (f *formatter) formatSuggestions(suggs api.Suggestions) {
 }
 
 func (f *formatter) formatJSON(data interface{}) {
-	must(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
+	handle(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
 }
 
 func (f *formatter) formatTemplate(data interface{}) error {
 	t, err := template.New("pocwebc").Parse(strings.Replace(formatTemplate, "\\n", "\n", -1))
-	must(err, "invalid format string: %v")
+	handle(err, "invalid format string: %v")
 	err = t.Execute(os.Stdout, data)
-	must(err, "cannot format template: %v")
+	handle(err, "cannot format template: %v")
 	return nil
 }
 
