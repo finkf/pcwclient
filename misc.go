@@ -14,7 +14,7 @@ import (
 
 func init() {
 	searchCommand.Flags().StringVarP(&searchType, "type", "t",
-		"token", "set search type (token|pattern|ac)")
+		"token", "set search type (token|pattern|ac|regex)")
 	searchCommand.Flags().BoolVarP(&formatOCR, "ocr", "o", false,
 		"print ocr lines")
 	searchCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
@@ -161,6 +161,8 @@ func searchTypeFromString(typ string) (api.SearchType, error) {
 		return api.SearchPattern, nil
 	case "ac":
 		return api.SearchAC, nil
+	case "regex":
+		return api.SearchRegex, nil
 	default:
 		return "", fmt.Errorf("invalid search type: %s", typ)
 	}
@@ -178,30 +180,41 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	return search(os.Stdout, id, typ, args[1:]...)
 }
 
+func hasAnyMatch(res *api.SearchResults) bool {
+	for _, m := range res.Matches {
+		if len(m.Lines) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 	c := newClient(out)
 	var done bool
 	var f formatter
 	defer f.done()
+	searcher := api.Searcher{
+		Skip: searchSkip,
+		Max:  searchMax,
+		IC:   searchIC,
+		Type: typ,
+	}
 	for !done && c.err == nil {
 		c.do(func(client *api.Client) (interface{}, error) {
-			s := api.Search{
-				Client: *client,
-				Skip:   searchSkip,
-				Max:    searchMax,
-				IC:     searchIC,
-				Type:   typ,
-			}
-			ret, err := s.Search(id, qs...)
-			must(err, "cannot search: %v")
+			searcher.Client = client
+			ret, err := searcher.Search(id, qs...)
+			handle(err, "cannot search: %v", err)
 			f.format(ret)
-			if len(ret.Matches) == 0 {
+			if !hasAnyMatch(ret) {
 				done = true
 				return nil, nil
 			}
 			if !searchAll {
 				done = true
 			}
+			// search for next batch
+			searcher.Skip += searcher.Max
 			return nil, nil
 		})
 	}
