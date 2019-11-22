@@ -25,11 +25,11 @@ var snippetCommand = cobra.Command{
 var snippetGetCommand = cobra.Command{
 	Use:   "get DIR IDS...",
 	Short: "download line snippets IDS into directory DIR",
-	Run:   doDownloadLineSnippets,
+	Run:   doGetSnippets,
 	Args:  cobra.MinimumNArgs(1),
 }
 
-func doDownloadLineSnippets(cmd *cobra.Command, args []string) {
+func doGetSnippets(cmd *cobra.Command, args []string) {
 	c := api.Authenticate(getURL(), getAuth(), skipVerify)
 	var line api.Line
 	for _, id := range args[1:] {
@@ -67,6 +67,10 @@ func downloadLineSnippet(c *api.Client, line *api.Line, dir string) {
 var snippetPutCommand = cobra.Command{
 	Use:   "put FILES...",
 	Short: "update snipptes FILES to the servcer",
-	Run:   doDownloadLineSnippets,
+	Run:   doPutSnippets,
 	Args:  cobra.MinimumNArgs(1),
+}
+
+func doPutSnippets(_ *cobra.Command, args []string) {
+
 }
