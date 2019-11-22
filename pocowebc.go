@@ -71,6 +71,9 @@ func init() {
 	deleteCommand.AddCommand(&deleteUsersCommand)
 	poolCommand.AddCommand(&downloadPoolCommand)
 	poolCommand.AddCommand(&runPoolCommand)
+	mainCommand.AddCommand(&snippetCommand)
+	snippetCommand.AddCommand(&snippetGetCommand)
+	snippetCommand.AddCommand(&snippetPutCommand)
 
 	mainCommand.SilenceUsage = true
 	mainCommand.SilenceErrors = true
