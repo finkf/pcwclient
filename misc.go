@@ -221,7 +221,7 @@ func search(out io.Writer, id int, typ api.SearchType, qs ...string) error {
 
 var downloadCommand = cobra.Command{
 	Use:   "download ID [OUTPUT-FILE]",
-	Short: "login to pocoweb",
+	Short: "dowload archive of book ID",
 	RunE:  doDownload,
 	Args:  cobra.RangeArgs(1, 2),
 }
