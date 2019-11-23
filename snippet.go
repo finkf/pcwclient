@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/finkf/gocropus"
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -51,7 +52,8 @@ func downloadLineSnippet(c *api.Client, line *api.Line, dir string) {
 	iout, err := os.Create(path)
 	handle(err, "cannot write image %s: %v", path)
 	defer iout.Close()
-	handle(c.DownloadLinePNG(iout, line), "cannot download line %s: %v", line.ID())
+	handle(c.DownloadLinePNG(iout, line),
+		"cannot download line %s: %v", line.ID())
 	// gt
 	if !snippetNoGT {
 		path = filepath.Join(dir, line.ID()+".gt.txt")
@@ -68,9 +70,26 @@ var snippetPutCommand = cobra.Command{
 	Use:   "put FILES...",
 	Short: "update snipptes FILES to the servcer",
 	Run:   doPutSnippets,
-	Args:  cobra.MinimumNArgs(1),
 }
 
 func doPutSnippets(_ *cobra.Command, args []string) {
+	c := api.Authenticate(getURL(), getAuth(), skipVerify)
+	for _, file := range args {
+		var img, llocs string
+		switch filepath.Ext(file) {
+		case gocropus.PngExt:
+			img = file
+			llocs, _ = gocropus.LLocsFromStripped(file, false)
+		case gocropus.LLocsExt:
+			llocs = file
+			img, _ = gocropus.ImageFromStripped(file)
+		default:
+			log.Fatalf("error: bad filename: %s", file)
+		}
+		putSnippet(c, img, llocs)
+	}
+}
+
+func putSnippet(c *api.Client, img, llocs string) {
 
 }
