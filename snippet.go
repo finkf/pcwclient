@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/finkf/gocropus"
+	"git.sr.ht/~flobar/gocropus"
 	"github.com/finkf/pcwgo/api"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -79,10 +79,10 @@ func doPutSnippets(_ *cobra.Command, args []string) {
 		switch filepath.Ext(file) {
 		case gocropus.PngExt:
 			img = file
-			llocs, _ = gocropus.LLocsFromStripped(file, false)
+			llocs, _ = gocropus.LLocsFromFile(file, false)
 		case gocropus.LLocsExt:
 			llocs = file
-			img, _ = gocropus.ImageFromStripped(file)
+			img, _ = gocropus.ImageFromFile(file)
 		default:
 			log.Fatalf("error: bad filename: %s", file)
 		}
