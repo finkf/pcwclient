@@ -68,7 +68,7 @@ func downloadLineSnippet(c *api.Client, line *api.Line, dir string) {
 
 var snippetPutCommand = cobra.Command{
 	Use:   "put FILES...",
-	Short: "update snipptes FILES to the servcer",
+	Short: "update snipptes FILES to the server",
 	Run:   doPutSnippets,
 }
 
