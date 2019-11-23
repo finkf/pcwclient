@@ -11,11 +11,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var snippetNoGT = false
+var (
+	snippetGetNoGT  = false
+	snippetPutImage = false
+	snippetPutNoOCR = false
+)
 
 func init() {
-	snippetGetCommand.Flags().BoolVarP(&snippetNoGT, "nogt", "n",
-		false, "do not crate gt file for snippet")
+	snippetGetCommand.Flags().BoolVarP(&snippetGetNoGT, "nogt", "n",
+		false, "do not crate gt file for snippets")
+	snippetPutCommand.Flags().BoolVarP(&snippetPutImage, "image", "i",
+		false, "upload image files")
+	snippetPutCommand.Flags().BoolVarP(&snippetPutNoOCR, "noocr", "n",
+		false, "do not upload ocr data")
 }
 
 var snippetCommand = cobra.Command{
@@ -55,7 +63,7 @@ func downloadLineSnippet(c *api.Client, line *api.Line, dir string) {
 	handle(c.DownloadLinePNG(iout, line),
 		"cannot download line %s: %v", line.ID())
 	// gt
-	if !snippetNoGT {
+	if !snippetGetNoGT {
 		path = filepath.Join(dir, line.ID()+".gt.txt")
 		handle(ioutil.WriteFile(path, []byte(line.Cor), 0666),
 			"cannot write ground-truth %s: %v", path)
