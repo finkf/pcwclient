@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/base64"
+	"fmt"
+	"image/png"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -99,5 +103,59 @@ func doPutSnippets(_ *cobra.Command, args []string) {
 }
 
 func putSnippet(c *api.Client, img, llocs string) {
+	var data api.PostOCR
+	var line api.Line
+	addID(&line, gocropus.Strip(llocs))
+	if snippetPutImage {
+		addImageData(&data, img)
+	}
+	if !snippetPutNoOCR {
+		addOCRData(&data, llocs)
+	}
+	handle(c.PutLineOCR(&line, &data), "cannot put snippet %s: %v", llocs)
+}
 
+func addImageData(data *api.PostOCR, path string) {
+	in, err := os.Open(path)
+	handle(err, "cannot open image %s: %v", path)
+	defer in.Close()
+	img, err := png.Decode(in)
+	handle(err, "cannot decode image %s: %v", path)
+	var buf bytes.Buffer
+	handle(png.Encode(&buf, img), "cannot convert image to bytes: %v")
+	data.ImageData = base64.StdEncoding.EncodeToString(buf.Bytes())
+}
+
+func addOCRData(data *api.PostOCR, path string) {
+	llocs, err := gocropus.OpenLLocsFile(path)
+	handle(err, "cannot open llocs %s: %v", path)
+	data.OCR = llocs.String()
+	data.Cuts = llocs.Cuts()
+	data.Confs = llocs.Confs()
+}
+
+func addID(line *api.Line, stripped string) {
+	// Try filename: id:id:id
+	var bid, pid, lid int
+	if n := parseIDs(filepath.Base(stripped), &bid, &pid, &lid); n == 3 {
+		line.ProjectID = bid
+		line.PageID = pid
+		line.LineID = lid
+		return
+	}
+	// Try file path: .../id/id/id
+	elems := filepath.SplitList(stripped)
+	if len(elems) < 3 {
+		log.Fatalf("error: cannot determine line ID for %s", stripped)
+	}
+	elems = elems[len(elems)-3:]
+	if _, err := fmt.Sscanf(elems[0], "%d", &line.ProjectID); err != nil {
+		log.Fatalf("error: cannot determine line ID for %s", stripped)
+	}
+	if _, err := fmt.Sscanf(elems[1], "%d", &line.PageID); err != nil {
+		log.Fatalf("error: cannot determine line ID for %s", stripped)
+	}
+	if _, err := fmt.Sscanf(elems[2], "%d", &line.LineID); err != nil {
+		log.Fatalf("error: cannot determine line ID for %s", stripped)
+	}
 }
