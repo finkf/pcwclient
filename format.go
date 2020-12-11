@@ -23,16 +23,6 @@ var formatArgs = struct {
 	json       bool
 }{}
 
-func handle(err error, args ...interface{}) {
-	if err == nil {
-		return
-	}
-	if len(args) > 0 {
-		err = fmt.Errorf(args[0].(string), append(args[1:], err)...)
-	}
-	log.Fatalf("error: %v", err)
-}
-
 func format(data interface{}) {
 	if formatMaybeSpecial(data) {
 		return
@@ -80,11 +70,11 @@ func format(data interface{}) {
 func printf(col *color.Color, format string, args ...interface{}) {
 	if col == nil {
 		_, err := fmt.Printf(format, args...)
-		handle(err)
+		chk(err)
 		return
 	}
 	_, err := col.Printf(format, args...)
-	handle(err)
+	chk(err)
 }
 
 var (
@@ -323,7 +313,7 @@ func formatMaybeJSON(data interface{}) bool {
 	if !formatArgs.json {
 		return false
 	}
-	handle(json.NewEncoder(os.Stdout).Encode(data), "cannot encode json: %v")
+	chk(json.NewEncoder(os.Stdout).Encode(data))
 	return true
 }
 
@@ -332,9 +322,9 @@ func formatMaybeTemplate(data interface{}) bool {
 		return false
 	}
 	t, err := template.New("pocwebc").Parse(strings.Replace(formatArgs.template, "\\n", "\n", -1))
-	handle(err, "invalid format string: %v")
+	chk(err)
 	err = t.Execute(os.Stdout, data)
-	handle(err, "cannot format template: %v")
+	chk(err)
 	return true
 }
 

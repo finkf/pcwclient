@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -53,33 +52,37 @@ func doPrintID(c *api.Client, id string) error {
 	id, mod = getMod(id)
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 5:
-		getWord(c, bid, pid, lid, wid, len)
+		return getWord(c, bid, pid, lid, wid, len)
 	case 4:
-		getWord(c, bid, pid, lid, wid, -1)
+		return getWord(c, bid, pid, lid, wid, -1)
 	case 3:
-		getLine(c, bid, pid, lid)
+		return getLine(c, bid, pid, lid)
 	case 2:
-		getPage(c, bid, pid, mod)
+		_, _, err := getPage(c, bid, pid, mod)
+		return err
 	case 1:
-		getPages(c, bid)
+		return getPages(c, bid)
 	default:
-		log.Fatalf("invalid id: %s", id)
+		return fmt.Errorf("invalid id: %s", id)
 	}
-	return nil
 }
 
-func getPages(c *api.Client, bid int) {
+func getPages(c *api.Client, bid int) error {
 	pageid := 0
 	for {
-		next, _ := getPage(c, bid, pageid, 0)
+		next, _, err := getPage(c, bid, pageid, 0)
+		if err != nil {
+			return fmt.Errorf("get pages: %v", err)
+		}
 		if next == pageid {
 			break
 		}
 		pageid = next
 	}
+	return nil
 }
 
-func getPage(c *api.Client, bid, pid, mod int) (int, int) {
+func getPage(c *api.Client, bid, pid, mod int) (int, int, error) {
 	var url string
 	switch pid {
 	case 0:
@@ -91,19 +94,24 @@ func getPage(c *api.Client, bid, pid, mod int) (int, int) {
 		url = appendModToURL(url, mod)
 	}
 	var p api.Page
-	handle(get(c, url, &p), "cannot get page: %v")
+	if err := get(c, url, &p); err != nil {
+		return 0, 0, fmt.Errorf("get page: %v", err)
+	}
 	format(&p)
-	return p.NextPageID, p.PrevPageID
+	return p.NextPageID, p.PrevPageID, nil
 }
 
-func getLine(c *api.Client, bid, pid, lid int) {
+func getLine(c *api.Client, bid, pid, lid int) error {
 	url := fmt.Sprintf("%s/books/%d/pages/%d/lines/%d", c.Host, bid, pid, lid)
 	var line api.Line
-	handle(get(c, url, &line), "cannot get line: %v")
+	if err := get(c, url, &line); err != nil {
+		return fmt.Errorf("get line: %v", err)
+	}
 	format(&line)
+	return nil
 }
 
-func getWord(c *api.Client, bid, pid, lid, wid, len int) {
+func getWord(c *api.Client, bid, pid, lid, wid, len int) error {
 	var url string
 	switch len {
 	case -1:
@@ -115,8 +123,11 @@ func getWord(c *api.Client, bid, pid, lid, wid, len int) {
 
 	}
 	var token api.Token
-	handle(get(c, url, &token), "cannot get word: %v")
+	if err := get(c, url, &token); err != nil {
+		return fmt.Errorf("get word: %v")
+	}
 	format(&token)
+	return nil
 }
 
 func getMod(id string) (string, int) {
