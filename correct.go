@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -12,92 +11,88 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var corType string
+var correctArgs = struct {
+	typ   string
+	stdin bool
+}{}
 
 func init() {
-	correctCommand.Flags().StringVarP(&corType, "type", "t",
+	correctCommand.Flags().StringVarP(&correctArgs.typ, "type", "t",
 		"automatic", "set correction type")
+	correctCommand.Flags().BoolVarP(&correctArgs.stdin, "stdin", "i",
+		false, "read IDs and corrections from stdin")
 }
 
 var correctCommand = cobra.Command{
 	Use:   "correct [ID CORRECTION]...",
 	Short: "Correct lines or words",
-	Args: func(c *cobra.Command, args []string) error {
-		// zero or 2+ args
-		if len(args)%2 != 0 {
-			return fmt.Errorf("expected an even number of arugments")
-		}
-		return nil
-	},
-	RunE: doCorrect,
+	Args:  cobra.MinimumNArgs(0),
+	RunE:  doCorrect,
 }
 
-func doCorrect(c *cobra.Command, args []string) error {
-	for i := 1; i < len(args); i += 2 {
-		if err := correct(os.Stdout, args[i-1], args[i],
-			api.CorType(corType)); err != nil {
-			return err
+func doCorrect(_ *cobra.Command, args []string) error {
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	if !correctArgs.stdin {
+		for i := 1; i < len(args); i += 2 {
+			id := args[i-1]
+			cor := args[i]
+			if err := correct(c, id, cor, correctArgs.typ); err != nil {
+				return fmt.Errorf("cannot correct: %v", err)
+			}
 		}
-	}
-	if len(args) > 0 {
 		return nil
 	}
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
-		args := strings.Fields(s.Text())
-		if len(args) < 2 {
-			return fmt.Errorf("invalid input line: %q", s.Text())
+		line := s.Text()
+		pos := strings.Index(line, " ")
+		if pos == -1 {
+			return fmt.Errorf("cannot correct: invalid input line: %q", line)
 		}
-		cor := strings.Join(args[1:], " ")
-		if err := correct(os.Stdout, args[0], cor, api.CorType(corType)); err != nil {
-			return err
+		id := line[:pos]
+		cor := line[pos+1:]
+		if err := correct(c, id, correctArgs.typ, cor); err != nil {
+			return fmt.Errorf("cannot correct: %v", err)
 		}
 	}
-	return s.Err()
+	if err := s.Err(); err != nil {
+		return fmt.Errorf("cannot correct: %v", err)
+	}
+	return nil
 }
 
-func correct(out io.Writer, id, correction string, typ api.CorType) error {
+func correct(c *api.Client, id, typ, correction string) error {
 	cor, err := strconv.Unquote(`"` + correction + `"`)
 	if err != nil {
-		return err
+		return fmt.Errorf("unqote %s: %v", correction, err)
 	}
+	var url string
+	var resp interface{}
+	var line api.Line
+	var token api.Token
 	var bid, pid, lid, wid, len int
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 3:
-		line := api.Line{ProjectID: bid, PageID: pid, LineID: lid}
-		return correctLine(os.Stdout, &line, api.CorType(typ), cor)
+		url = c.URL("books/%d/pages/%d/lines/%d?t=%s",
+			bid, pid, lid, typ)
+		resp = &line
 	case 4:
-		token := api.Token{ProjectID: bid, PageID: pid, LineID: lid, TokenID: wid}
-		return correctWord(os.Stdout, &token, -1, api.CorType(typ), cor)
+		url = c.URL("books/%d/pages/%d/lines/%d/tokens/%d?t=%s",
+			bid, pid, lid, wid, typ)
+		resp = &token
 	case 5:
-		token := api.Token{ProjectID: bid, PageID: pid, LineID: lid, TokenID: wid}
-		return correctWord(os.Stdout, &token, len, api.CorType(typ), cor)
+		url = c.URL("books/%d/pages/%d/lines/%d/tokens/%d?t=%s&len=%d",
+			bid, pid, lid, wid, typ, len)
+		resp = &token
 	default:
 		return fmt.Errorf("invalid id: %q", id)
 	}
-}
-
-func correctLine(out io.Writer, line *api.Line, typ api.CorType, cor string) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		handle(client.PutLineX(line, typ, cor), "cannot correct line: %v")
-		format(line)
-		return nil, nil
-	})
-	return c.done()
-}
-
-func correctWord(out io.Writer, token *api.Token, len int, typ api.CorType, cor string) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		if len == -1 {
-			handle(client.PutTokenX(token, typ, cor), "cannot correct token: %v")
-			format(token)
-			return nil, nil
-		}
-		handle(client.PutTokenLenX(token, len, typ, cor), "cannot correct token: %v")
-		format(token)
-		return nil, nil
-	})
-	return c.done()
+	err = c.Put(url, struct {
+		Cor string `json:"correction"`
+	}{cor}, resp)
+	if err != nil {
+		return err
+	}
+	format(resp)
+	return nil
 }

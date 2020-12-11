@@ -12,8 +12,8 @@ import (
 	"path"
 	"path/filepath"
 
+	"github.com/UNO-SOFT/ulog"
 	"github.com/finkf/pcwgo/api"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -124,11 +124,13 @@ func openAsZIP(p string) (io.ReadCloser, error) {
 			internalPath += "/"
 			header.Name = internalPath
 			_, e := w.CreateHeader(header)
-			log.Debugf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
+			ulog.Write("filepath.Walk", "path", p,
+				"internal", internalPath, "prefix", prefix)
 			return e
 		}
 		// copy file
-		log.Debugf("filepath.Walk: %s (%s - %d)", p, internalPath, prefix)
+		ulog.Write("filepath.Walk", "path", p,
+			"internal", internalPath, "prefix", prefix)
 		header.Method = zip.Deflate
 		// open file
 		in, e := os.Open(p)

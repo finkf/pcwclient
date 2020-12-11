@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
+	"net/url"
 	"strings"
 
+	"github.com/finkf/gofiler"
 	"github.com/finkf/pcwgo/api"
 	"github.com/spf13/cobra"
 )
@@ -20,257 +20,294 @@ func init() {
 		"list historical rewrite patterns")
 	listCharsCommand.Flags().StringVarP(&listCharsFilter,
 		"filter", "f", "A-Za-z0-9", "set filter characters")
-
 }
 
 var listCommand = cobra.Command{
 	Use:   "list",
-	Short: "List various informations",
+	Short: "list various informations",
 }
 
 var listUsersCommand = cobra.Command{
-	Use:   "users",
-	Short: "List user information",
+	Use:   "users [IDs...]",
+	Short: "list user information",
 	RunE:  doListUsers,
+	Long: `
+List user information for the users with the given IDs.  If no IDs are
+given, information about all users is listed.`,
 }
 
 func doListUsers(cmd *cobra.Command, args []string) error {
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	if len(args) == 0 {
-		return listAllUsers(os.Stdout)
+		return listAllUsers(c)
 	}
-	return listUsers(os.Stdout, args...)
+	return listUsers(c, args...)
 }
 
-func listUsers(out io.Writer, ids ...string) error {
-	c := newClient(out)
+func listUsers(c *api.Client, ids ...string) error {
 	for _, id := range ids {
 		var uid int
 		if n := parseIDs(id, &uid); n != 1 {
-			return fmt.Errorf("invalid user id: %q", id)
+			return fmt.Errorf("list user: invalid user id: %q", id)
 		}
-		c.do(func(client *api.Client) (interface{}, error) {
-			return client.GetUser(int64(uid))
-		})
+		var user api.User
+		if err := get(c, c.URL("users/%d", uid), &user); err != nil {
+			return fmt.Errorf("list user %d: %v", uid, err)
+		}
+		format(&user)
 	}
-	return c.done()
+	return nil
 }
 
-func listAllUsers(out io.Writer) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return client.GetUsers()
-	})
-	return c.done()
+func listAllUsers(c *api.Client) error {
+	var users api.Users
+	if err := get(c, c.URL("users"), &users); err != nil {
+		return fmt.Errorf("list users: %v", err)
+	}
+	format(&users)
+	return nil
 }
 
 var listBooksCommand = cobra.Command{
-	Use:   "books [ID [IDS...]]",
-	Short: "List book information",
+	Use:   "books [IDs...]",
+	Short: "list book information",
 	RunE:  doListBooks,
+	Long: `
+List book information for the books and/or packages with the given
+IDs.  If no IDs are given, information about all available books
+and/or packages is listed.`,
 }
 
 func doListBooks(cmd *cobra.Command, args []string) error {
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	if len(args) == 0 {
-		return listAllBooks(os.Stdout)
+		return listAllBooks(c)
 	}
-	return listBooks(os.Stdout, args...)
+	return listBooks(c, args...)
 }
 
-func listBooks(out io.Writer, ids ...string) error {
-	c := newClient(out)
+func listBooks(c *api.Client, ids ...string) error {
 	for _, id := range ids {
 		var bid int
 		if n := parseIDs(id, &bid); n != 1 {
-			return fmt.Errorf("invalid book id: %q", id)
+			return fmt.Errorf("list book: invalid book id: %q", id)
 		}
-		c.do(func(client *api.Client) (interface{}, error) {
-			return client.GetBook(bid)
-		})
+		var book api.Book
+		if err := get(c, c.URL("books/%d", bid), &book); err != nil {
+			return fmt.Errorf("list book %d: %v", bid, err)
+		}
+		format(&book)
 	}
-	return c.done()
+	return nil
 }
 
-func listAllBooks(out io.Writer) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return client.GetBooks()
-	})
-	return c.done()
+func listAllBooks(c *api.Client) error {
+	var books api.Books
+	if err := get(c, c.URL("books"), &books); err != nil {
+		return fmt.Errorf("list books: %v", err)
+	}
+	format(&books)
+	return nil
 }
 
 var listPatternsCommand = cobra.Command{
-	Use:   "patterns ID [QUERY [QUERY...]]",
-	Short: "List patterns for the given book",
+	Use:   "patterns ID [QUERY...]",
+	Short: "list patterns for the given book",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  doListPatterns,
 }
 
-func doListPatterns(cmd *cobra.Command, args []string) error {
+func doListPatterns(_ *cobra.Command, args []string) error {
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	var bid int
 	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+		return fmt.Errorf("list patterns: invalid book id: %q", args[0])
 	}
-	switch len(args) {
+	u := unescape(args...)
+	switch len(u) {
 	case 1:
-		return listAllPatterns(os.Stdout, bid)
-	case 2:
-		return listPatterns(os.Stdout, bid, args[1])
+		return listPatterns(c, bid)
 	default:
-		return listPatterns(os.Stdout, bid, args[1], args[2:]...)
+		return listPatterns(c, bid, u[1:]...)
 	}
 }
 
-func listAllPatterns(out io.Writer, id int) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetPatterns(id, !histPatterns)
-	})
-	return c.done()
-}
-
-func listPatterns(out io.Writer, id int, q string, qs ...string) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.QueryPatterns(id, !histPatterns, q, qs...)
-	})
-	return c.done()
+func listPatterns(c *api.Client, id int, qs ...string) error {
+	uri := c.URL("profile/patterns/books/%d?ocr=%t", id, !histPatterns)
+	for _, q := range qs {
+		uri += "&q=" + url.QueryEscape(q)
+	}
+	var counts api.PatternCounts
+	if err := get(c, uri, &counts); err != nil {
+		return fmt.Errorf("list patterns for book %d: %v", id, err)
+	}
+	format(&counts)
+	return nil
 }
 
 var listSuggestionsCommand = cobra.Command{
-	Use:   "suggestions ID [QUERY [QUERY...]]",
-	Short: "List profiler suggestions for the given book",
+	Use:   "suggestions ID [QUERY...]",
+	Short: "list profiler suggestions for the given book",
 	Args:  cobra.MinimumNArgs(1),
 	RunE:  doListSuggestions,
 }
 
 func doListSuggestions(cmd *cobra.Command, args []string) error {
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	var bid int
 	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+		return fmt.Errorf("list suggestions: invalid book id: %q", args[0])
 	}
-	u := unescape(args[1:]...)
+	u := unescape(args...)
 	switch len(u) {
-	case 0:
-		return listAllSuggestions(os.Stdout, bid)
 	case 1:
-		return listSuggestions(os.Stdout, bid, u[0])
+		return listSuggestions(c, bid)
 	default:
-		return listSuggestions(os.Stdout, bid, u[0], u[1:]...)
+		return listSuggestions(c, bid, u[1:]...)
 	}
 }
 
-func listAllSuggestions(out io.Writer, id int) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetProfile(id)
-	})
-	return c.done()
-}
+func listSuggestions(c *api.Client, id int, qs ...string) error {
+	uri := c.URL("profile/books/%d", id)
+	pre := "?"
+	for _, q := range qs {
+		uri += pre + "q=" + url.QueryEscape(q)
+		pre = "&"
+	}
+	if len(qs) == 0 {
+		var profile gofiler.Profile
+		if err := get(c, uri, &profile); err != nil {
+			return fmt.Errorf("list suggestions for book %d: %v", id, err)
+		}
+		format(profile)
+		return nil
+	}
+	var suggs api.Suggestions
+	if err := get(c, uri, &suggs); err != nil {
+		return fmt.Errorf("list suggestions for book %d: %v", id, err)
+	}
+	format(suggs)
+	return nil
 
-func listSuggestions(out io.Writer, id int, q string, qs ...string) error {
-	c := newClient(out)
-	c.do(func(client *api.Client) (interface{}, error) {
-		s, err := c.client.QueryProfile(id, q, qs...)
-		handle(err, "cannot query profile: %v")
-		format(s)
-		return nil, nil
-	})
-	return c.done()
 }
 
 var listSuspiciousCommand = cobra.Command{
-	Use:   "suspicious ID",
-	Short: "List suspicous words for the given book",
-	Args:  exactlyNIDs(1),
+	Use:   "suspicious ID [IDs...]",
+	Short: "list suspicous words for the given books",
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  doListSuspicious,
 }
 
 func doListSuspicious(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	for i := range args {
+		var bid int
+		if n := parseIDs(args[i], &bid); n != 1 {
+			return fmt.Errorf("list suspicious: invalid book id: %q", args[i])
+		}
+		url := c.URL("profile/suspicious/books/%d", bid)
+		var counts api.SuggestionCounts
+		if err := get(c, url, &counts); err != nil {
+			return fmt.Errorf("list suspicious for %d: %v", bid, err)
+		}
+		format(&counts)
 	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetSuspicious(bid)
-	})
-	return c.done()
+	return nil
 }
 
 var listAdaptiveCommand = cobra.Command{
-	Use:   "adaptive ID",
-	Short: "List adaptive tokens for the given book",
-	Args:  exactlyNIDs(1),
+	Use:   "adaptive ID [IDs...]",
+	Short: "list adaptive tokens for the given books",
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  doListAdaptive,
 }
 
 func doListAdaptive(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	for i := range args {
+		var bid int
+		if n := parseIDs(args[i], &bid); n != 1 {
+			return fmt.Errorf("list adaptive tokens: invalid book id: %q", args[i])
+		}
+		url := c.URL("profile/adaptive/books/%d", bid)
+		var tokens api.AdaptiveTokens
+		if err := get(c, url, &tokens); err != nil {
+			return fmt.Errorf("list adaptive tokens for book %d: %v", bid, err)
+		}
+		format(&tokens)
 	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetAdaptiveTokens(bid)
-	})
-	return c.done()
+	return nil
 }
 
 var listELCommand = cobra.Command{
-	Use:   "el ID",
-	Short: "List extended lexicon tokens for the given book",
-	Args:  exactlyNIDs(1),
+	Use:   "el [ID...]",
+	Short: "list extended lexicon tokens for the given books",
 	RunE:  doListEL,
 }
 
 func doListEL(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	for i := range args {
+		var bid int
+		if n := parseIDs(args[i], &bid); n != 1 {
+			return fmt.Errorf("list extended lexicon entries: invalid book id: %q", args[i])
+		}
+		url := c.URL("postcorrect/le/books/%d", bid)
+		var el api.ExtendedLexicon
+		if err := get(c, url, &el); err != nil {
+			return fmt.Errorf("list extended lexicon entries for book %d: %v", bid, err)
+		}
+		format(&el)
 	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetExtendedLexicon(bid)
-	})
-	return c.done()
+	return nil
 }
 
 var listRRDMCommand = cobra.Command{
-	Use:   "rrdm ID",
-	Short: "List post correction for the given book",
-	Args:  exactlyNIDs(1),
+	Use:   "rrdm [ID...]",
+	Short: "list post correction for the given book",
 	RunE:  doListRRDM,
 }
 
 func doListRRDM(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	for i := range args {
+		var bid int
+		if n := parseIDs(args[i], &bid); n != 1 {
+			return fmt.Errorf("list post corrections: invalid book id: %q", args[i])
+		}
+		url := c.URL("postcorrect/books/%d", bid)
+		var pc api.PostCorrection
+		if err := get(c, url, &pc); err != nil {
+			return fmt.Errorf("list post corrections for book %d: %v", bid, err)
+		}
+		format(&pc)
 	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetPostCorrection(bid)
-	})
-	return c.done()
+	return nil
 }
 
 var listCharsCommand = cobra.Command{
 	Use:   "chars ID",
-	Short: "List frequency list of characters in book ID",
-	Args:  exactlyNIDs(1),
+	Short: "list frequency list of characters in book ID",
+	Args:  cobra.MinimumNArgs(1),
 	RunE:  doListChars,
 }
 
 func doListChars(_ *cobra.Command, args []string) error {
-	var bid int
-	if n := parseIDs(args[0], &bid); n != 1 {
-		return fmt.Errorf("invalid book id: %q", args[0])
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
+	for i := range args {
+		var bid int
+		if n := parseIDs(args[i], &bid); n != 1 {
+			return fmt.Errorf("list chars: invalid book id: %q", args[i])
+		}
+		url := c.URL("books/%d/charmap?filter=%s",
+			bid, url.QueryEscape(charFilter()))
+		var chars api.CharMap
+		if err := get(c, url, &chars); err != nil {
+			return fmt.Errorf("list chars for book %d: %v", bid, err)
+		}
+		format(&chars)
 	}
-	c := newClient(os.Stdout)
-	c.do(func(client *api.Client) (interface{}, error) {
-		return c.client.GetCharMap(bid, charFilter())
-	})
-	return c.done()
+	return nil
 }
 
 func charFilter() string {

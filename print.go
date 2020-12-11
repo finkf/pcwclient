@@ -2,32 +2,35 @@ package main
 
 import (
 	"bufio"
+	"fmt"
+	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/finkf/pcwgo/api"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	printCommand.Flags().BoolVarP(&formatWords, "words", "w", false,
+	printCommand.Flags().BoolVarP(&formatArgs.words, "words", "w", false,
 		"print words not lines")
-	printCommand.Flags().BoolVarP(&formatOCR, "ocr", "o", false,
+	printCommand.Flags().BoolVarP(&formatArgs.ocr, "ocr", "o", false,
 		"print ocr lines")
-	printCommand.Flags().BoolVarP(&noFormatCor, "nocor", "c", false,
+	printCommand.Flags().BoolVarP(&formatArgs.noCor, "nocor", "c", false,
 		"do not print corrected lines")
-	printCommand.Flags().BoolVarP(&formatOnlyManual, "manual", "m", false,
+	printCommand.Flags().BoolVarP(&formatArgs.onlyManual, "manual", "m", false,
 		"only print manual corrected lines/words")
 }
 
 var printCommand = cobra.Command{
 	Use:   "print IDs...",
-	Short: "print books, pages, lines and words",
+	Short: "Print books, pages, lines and/or words",
 	RunE:  printIDs,
 }
 
 func printIDs(_ *cobra.Command, args []string) error {
-	c := api.Authenticate(getURL(), getAuth(), skipVerify)
+	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	for _, id := range args {
 		if err := doPrintID(c, id); err != nil {
 			return err
@@ -46,7 +49,8 @@ func printIDs(_ *cobra.Command, args []string) error {
 }
 
 func doPrintID(c *api.Client, id string) error {
-	var bid, pid, lid, wid, len int
+	var bid, pid, lid, wid, len, mod int
+	id, mod = getMod(id)
 	switch n := parseIDs(id, &bid, &pid, &lid, &wid, &len); n {
 	case 5:
 		getWord(c, bid, pid, lid, wid, len)
@@ -55,7 +59,7 @@ func doPrintID(c *api.Client, id string) error {
 	case 3:
 		getLine(c, bid, pid, lid)
 	case 2:
-		getPage(c, bid, pid)
+		getPage(c, bid, pid, mod)
 	case 1:
 		getPages(c, bid)
 	default:
@@ -67,57 +71,71 @@ func doPrintID(c *api.Client, id string) error {
 func getPages(c *api.Client, bid int) {
 	pageid := 0
 	for {
-		p, err := getPageImpl(c, bid, pageid)
-		handle(err, "cannot get page %d: %v", pageid)
-		if p.PageID == p.NextPageID {
+		next, _ := getPage(c, bid, pageid, 0)
+		if next == pageid {
 			break
 		}
-		pageid = p.NextPageID
-		format(p)
+		pageid = next
 	}
 }
 
-func getPage(c *api.Client, bid, pid int) {
-	var p *api.Page
-	var err error
+func getPage(c *api.Client, bid, pid, mod int) (int, int) {
+	var url string
 	switch pid {
 	case 0:
-		p, err = c.GetFirstPage(bid)
+		url = c.URL("books/%d/pages/first", bid)
 	case -1:
-		p, err = c.GetLastPage(bid)
+		url = c.URL("books/%d/pages/last", bid)
 	default:
-		p, err = c.GetPage(bid, pid)
+		url = c.URL("books/%d/pages/%d", bid, pid)
+		url = appendModToURL(url, mod)
 	}
-	handle(err, "cannot get page: %v")
-	format(p)
-}
-
-func getPageImpl(c *api.Client, bid, pid int) (*api.Page, error) {
-	switch pid {
-	case 0:
-		return c.GetFirstPage(bid)
-	case -1:
-		return c.GetLastPage(bid)
-	default:
-		return c.GetPage(bid, pid)
-	}
+	var p api.Page
+	handle(get(c, url, &p), "cannot get page: %v")
+	format(&p)
+	return p.NextPageID, p.PrevPageID
 }
 
 func getLine(c *api.Client, bid, pid, lid int) {
-	l, err := c.GetLine(bid, pid, lid)
-	handle(err, "cannot get line: %v")
-	format(l)
+	url := fmt.Sprintf("%s/books/%d/pages/%d/lines/%d", c.Host, bid, pid, lid)
+	var line api.Line
+	handle(get(c, url, &line), "cannot get line: %v")
+	format(&line)
 }
 
 func getWord(c *api.Client, bid, pid, lid, wid, len int) {
-	var err error
-	var t *api.Token
+	var url string
 	switch len {
 	case -1:
-		t, err = c.GetToken(bid, pid, lid, wid)
+		url = c.URL("books/%d/pages/%d/lines/%d/tokens/%d",
+			bid, pid, lid, wid)
 	default:
-		t, err = c.GetTokenLen(bid, pid, lid, wid, len)
+		url = c.URL("books/%d/pages/%d/lines/%d/tokens/%d?len=%d",
+			c.Host, bid, pid, lid, wid, len)
+
 	}
-	handle(err, "cannot get word: %v")
-	format(t)
+	var token api.Token
+	handle(get(c, url, &token), "cannot get word: %v")
+	format(&token)
+}
+
+func getMod(id string) (string, int) {
+	if pos := strings.Index(id, "/"); pos != -1 {
+		mod, err := strconv.Atoi(id[pos+1:])
+		if err != nil {
+			return id, 0
+		}
+		return id[:pos], mod
+	}
+	return id, 0
+}
+
+func appendModToURL(url string, mod int) string {
+	if mod > 0 {
+		return url + fmt.Sprintf("/next/%d", mod)
+	}
+	if mod < 0 {
+		return url + fmt.Sprintf("/prev/%d", -mod)
+	}
+	return url
 }

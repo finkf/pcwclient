@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/UNO-SOFT/ulog"
 	"github.com/finkf/pcwgo/api"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
