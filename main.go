@@ -24,9 +24,9 @@ Command line client for pocoweb. You can use it to automate or test
 the pocoweb post-correction.
 
 In order to use the command line client, you should use the
-PCWCLIENT_URL and PCWCLIENT_AUTH environment varibales to set the url
-and the authentification token respectively or set the appropriate
---url and --auth parameters accordingly.`,
+POCOWEB_URL and POCOWEB_AUTH environment varibales to set the url and
+the authentification token respectively or set the appropriate --url
+and --auth parameters accordingly.`,
 }
 
 func init() {

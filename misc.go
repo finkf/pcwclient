@@ -64,8 +64,8 @@ func login(user, password string) error {
 func getLogin() error {
 	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
 	var session api.Session
-	if err := get(c, c.URL("login"), &session); err != nil {
-		return fmt.Errorf("login: %v", err)
+	if err := get(c, c.URL("get login"), &session); err != nil {
+		return fmt.Errorf("get login: %v", err)
 	}
 	format(session)
 	return nil
