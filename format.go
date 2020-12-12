@@ -252,9 +252,9 @@ func formatProfile(profile gofiler.Profile) {
 }
 
 func formatSession(s api.Session) {
-	printf(nil, "%d %s %s %s %s\n",
-		s.User.ID, s.User.Email, s.User.Name, s.Auth,
-		time.Unix(s.Expires, 0).Format(time.RFC3339))
+	printf(nil, "%d %s %s %t %s %s\n",
+		s.User.ID, s.User.Email, s.User.Name, s.User.Admin,
+		s.Auth, time.Unix(s.Expires, 0).Format(time.RFC3339))
 }
 
 func formatUsers(users *api.Users) {

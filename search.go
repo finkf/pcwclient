@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net/url"
-	"os"
-	"strings"
 
 	"github.com/finkf/pcwgo/api"
 	"github.com/spf13/cobra"
@@ -30,32 +27,6 @@ func init() {
 		0, "set skip matches")
 }
 
-var versionCommand = cobra.Command{
-	Use:   "version",
-	Short: "get version information",
-	RunE:  runVersion,
-}
-
-func runVersion(_ *cobra.Command, args []string) error {
-	url := getURL()
-	if url == "" {
-		return fmt.Errorf("missing url: use --url, or set POCOWEBC_URL")
-	}
-	var version api.Version
-	c := api.NewClient(url, mainArgs.skipVerify)
-	if err := get(c, c.URL("api-version"), &version); err != nil {
-		return fmt.Errorf("get api version: %v", err)
-	}
-	return nil
-}
-
-var searchCommand = cobra.Command{
-	Use:   "search ID [QUERIES...]",
-	Short: "search for tokens and error patterns",
-	RunE:  runSearch,
-	Args:  cobra.MinimumNArgs(1),
-}
-
 var searchArgs = struct {
 	skip int
 	max  int
@@ -63,6 +34,13 @@ var searchArgs = struct {
 	all  bool
 	ic   bool
 }{}
+
+var searchCommand = cobra.Command{
+	Use:   "search ID [QUERIES...]",
+	Short: "search for tokens and error patterns",
+	RunE:  runSearch,
+	Args:  cobra.MinimumNArgs(1),
+}
 
 func runSearch(_ *cobra.Command, args []string) error {
 	var id int
@@ -86,7 +64,8 @@ func search(id int, qs ...string) error {
 	skip := searchArgs.skip
 	for {
 		uri := c.URL("books/%d/search?i=%t&max=%d&skip=%d&type=%s",
-			id, searchArgs.ic, searchArgs.max, skip, url.QueryEscape(searchArgs.typ))
+			id, searchArgs.ic, searchArgs.max, skip,
+			url.QueryEscape(searchArgs.typ))
 		for _, q := range qs {
 			uri += "&q=" + url.QueryEscape(q)
 		}
@@ -102,44 +81,6 @@ func search(id int, qs ...string) error {
 			break
 		}
 		skip += searchArgs.max
-	}
-	return nil
-}
-
-var downloadCommand = cobra.Command{
-	Use:   "download ID [FILE]",
-	Short: "dowload archive of book ID",
-	RunE:  doDownload,
-	Args:  cobra.RangeArgs(1, 2),
-}
-
-func doDownload(_ *cobra.Command, args []string) error {
-	if len(args) == 1 {
-		return download(os.Stdout, args[0])
-	}
-	out, err := os.Create(args[1])
-	if err != nil {
-		return fmt.Errorf("download to %s: %v", args[1], err)
-	}
-	defer out.Close()
-	return download(out, args[0])
-}
-
-func download(out io.Writer, id string) error {
-	var bid int
-	if n := parseIDs(id, &bid); n != 1 {
-		return fmt.Errorf("download: invalid book id: %s", id)
-	}
-	c := api.Authenticate(getURL(), getAuth(), mainArgs.skipVerify)
-	var ar struct {
-		Archive string `json:"archive"`
-	}
-	if err := get(c, c.URL("books/%d/download", bid), &ar); err != nil {
-		return fmt.Errorf("download: %v", err)
-	}
-	url := strings.TrimRight(c.Host, "/") + "/" + strings.TrimLeft(ar.Archive, "/")
-	if err := downloadZIP(c, url, out); err != nil {
-		return fmt.Errorf("download: %v", err)
 	}
 	return nil
 }

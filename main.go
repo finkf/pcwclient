@@ -38,6 +38,8 @@ func init() {
 	mainCommand.AddCommand(&correctCommand)
 	mainCommand.AddCommand(&downloadCommand)
 	mainCommand.AddCommand(&pkgCommand)
+	downloadCommand.AddCommand(&downloadBookCommand)
+	downloadCommand.AddCommand(&downloadPoolCommand)
 	pkgCommand.AddCommand(&pkgAssignCommand)
 	pkgCommand.AddCommand(&pkgReassignCommand)
 	pkgCommand.AddCommand(&pkgSplitCommand)

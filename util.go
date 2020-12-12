@@ -74,22 +74,22 @@ func getAuth() string {
 }
 
 func get(c *api.Client, url string, out interface{}) error {
-	ulog.Write("get", "method", "GET", "url", url)
+	ulog.Write("get", "method", "GET", "url", url, "auth", getAuth())
 	return c.Get(url, out)
 }
 
 func post(c *api.Client, url string, payload, out interface{}) error {
-	ulog.Write("post", "method", "POST", "url", url)
+	ulog.Write("post", "method", "POST", "url", url, "auth", getAuth())
 	return c.Post(url, payload, out)
 }
 
 func delete(c *api.Client, url string, out interface{}) error {
-	ulog.Write("post", "method", "DELETE", "url", url)
+	ulog.Write("post", "method", "DELETE", "url", url, "auth", getAuth())
 	return c.Delete(url, nil)
 }
 
 func downloadZIP(c *api.Client, url string, out io.Writer) error {
-	ulog.Write("download zip", "method", "GET", "url", url)
+	ulog.Write("download zip", "method", "GET", "url", url, "auth", getAuth())
 	req, err := http.NewRequest(http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return err
