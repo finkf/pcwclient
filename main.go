@@ -1,7 +1,5 @@
 package main // import "github.com/finkf/pcwclient"
 import (
-	"log"
-
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +77,5 @@ func init() {
 }
 
 func main() {
-	if err := mainCommand.Execute(); err != nil {
-		log.Fatalf("error: %v\n", err)
-	}
+	chk(mainCommand.Execute())
 }

@@ -63,14 +63,14 @@ func getURL() string {
 	if mainArgs.pocowebURL != "" {
 		return mainArgs.pocowebURL
 	}
-	return os.Getenv("PCWCLIENT_URL")
+	return os.Getenv("POCOWEB_URL")
 }
 
 func getAuth() string {
 	if mainArgs.authToken != "" {
 		return mainArgs.authToken
 	}
-	return os.Getenv("PCWCLIENT_AUTH")
+	return os.Getenv("POCOWEB_AUTH")
 }
 
 func get(c *api.Client, url string, out interface{}) error {

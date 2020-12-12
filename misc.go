@@ -51,7 +51,7 @@ func login(user, password string) error {
 	// }
 	url := getURL()
 	if url == "" {
-		return fmt.Errorf("login: missing url: use --url or PCWCLIENT_URL")
+		return fmt.Errorf("login: missing url: use --url or POCOWEB_URL")
 	}
 	c, err := api.Login(url, user, password, mainArgs.skipVerify)
 	if err != nil {
