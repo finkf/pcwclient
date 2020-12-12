@@ -23,5 +23,6 @@ func runVersion(_ *cobra.Command, args []string) error {
 	if err := get(c, c.URL("api-version"), &version); err != nil {
 		return fmt.Errorf("get api version: %v", err)
 	}
+	format(version)
 	return nil
 }

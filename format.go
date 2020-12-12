@@ -54,6 +54,8 @@ func format(data interface{}) {
 		formatProfile(t)
 	case api.Session:
 		formatSession(t)
+	case api.Version:
+		printf(nil, "%s\n", t.Version)
 	case *api.Users:
 		formatUsers(t)
 	case *api.User:
