@@ -323,7 +323,8 @@ func formatMaybeTemplate(data interface{}) bool {
 	if formatArgs.template == "" {
 		return false
 	}
-	t, err := template.New("pocwebc").Parse(strings.Replace(formatArgs.template, "\\n", "\n", -1))
+	t, err := template.New("pocwebc").
+		Parse(strings.Replace(formatArgs.template, "\\n", "\n", -1))
 	chk(err)
 	err = t.Execute(os.Stdout, data)
 	chk(err)
