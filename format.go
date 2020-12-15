@@ -70,6 +70,11 @@ func format(data interface{}) {
 }
 
 func printf(col *color.Color, format string, args ...interface{}) {
+	for i := range args {
+		if str, ok := args[i].(string); ok {
+			args[i] = s(str)
+		}
+	}
 	if col == nil {
 		_, err := fmt.Printf(format, args...)
 		chk(err)
@@ -77,6 +82,13 @@ func printf(col *color.Color, format string, args ...interface{}) {
 	}
 	_, err := col.Printf(format, args...)
 	chk(err)
+}
+
+func s(str string) string {
+	if str == "" {
+		return "ϵ"
+	}
+	return strings.ReplaceAll(str, " ", "_")
 }
 
 var (
